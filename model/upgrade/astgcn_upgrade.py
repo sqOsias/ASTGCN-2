@@ -6,25 +6,22 @@ from model.astgcn import Spatial_Attention_layer, Temporal_Attention_layer
 from model.upgrade.adaptive_graph import AdaptiveGraph
 from model.upgrade.temporal_transformer import TemporalTransformer
 
-
-class AdaptiveChebConv(nn.Module):
-    def __init__(self, num_of_filters, K, num_of_vertices, adaptive_graph):
-        super(AdaptiveChebConv, self).__init__()
+class AdaptiveDiffusionConv(nn.Module):
+    # 修复更名：自适应矩阵不严格正交，摒弃切比雪夫采用随机游走扩散卷积更数学严谨
+    def __init__(self, in_channels, num_of_filters, K, num_of_vertices, adaptive_graph):
+        super(AdaptiveDiffusionConv, self).__init__()
         self.K = K
         self.num_of_filters = num_of_filters
         self.num_of_vertices = num_of_vertices
         self.adaptive_graph = adaptive_graph
-        self.Theta = None
-
-    def _lazy_theta(self, shape, x):
-        if self.Theta is None:
-            theta = torch.empty(*shape, device=x.device, dtype=x.dtype)
-            nn.init.xavier_uniform_(theta)
-            self.Theta = nn.Parameter(theta)
+        
+        # 修复致命错误：移除了 Lazy 的初始化，严格在 init 中注册 nn.Parameter
+        self.Theta = nn.Parameter(torch.empty(self.K, in_channels, self.num_of_filters))
+        nn.init.xavier_uniform_(self.Theta)
 
     def forward(self, x, spatial_attention):
         batch_size, num_of_vertices, num_of_features, num_of_timesteps = x.shape
-        self._lazy_theta((self.K, num_of_features, self.num_of_filters), x)
+        
         adj = self.adaptive_graph()
         if spatial_attention is not None:
             adj = adj.unsqueeze(0) * spatial_attention
@@ -36,7 +33,7 @@ class AdaptiveChebConv(nn.Module):
         for _ in range(2, self.K):
             supports.append(torch.matmul(supports[-1], adj))
 
-        outputs = []
+        outputs =[]
         for time_step in range(num_of_timesteps):
             graph_signal = x[:, :, :, time_step]
             output = torch.zeros((batch_size, num_of_vertices, self.num_of_filters), device=x.device, dtype=x.dtype)
@@ -45,18 +42,18 @@ class AdaptiveChebConv(nn.Module):
                 rhs = torch.bmm(supports[k].permute(0, 2, 1), graph_signal)
                 output = output + torch.matmul(rhs, theta_k)
             outputs.append(output.unsqueeze(-1))
+            
         return F.relu(torch.cat(outputs, dim=-1))
 
 
 class UpgradeASTGCNBlock(nn.Module):
-    def __init__(self, backbone, num_of_vertices, spatial_mode, temporal_mode,
+    def __init__(self, in_channels, backbone, num_of_vertices, spatial_mode, temporal_mode,
                  adaptive_graph_cfg, transformer_cfg):
         super(UpgradeASTGCNBlock, self).__init__()
         K = backbone['K']
         num_of_chev_filters = backbone['num_of_chev_filters']
         num_of_time_filters = backbone['num_of_time_filters']
         time_conv_strides = backbone['time_conv_strides']
-        cheb_polynomials = backbone["cheb_polynomials"]
 
         self.spatial_mode = spatial_mode
         self.temporal_mode = temporal_mode
@@ -67,7 +64,7 @@ class UpgradeASTGCNBlock(nn.Module):
             self.spatial_conv = cheb_conv_with_SAt(
                 num_of_filters=num_of_chev_filters,
                 K=K,
-                cheb_polynomials=cheb_polynomials
+                cheb_polynomials=backbone.get("cheb_polynomials")
             )
         else:
             self.adaptive_graph = AdaptiveGraph(
@@ -76,7 +73,9 @@ class UpgradeASTGCNBlock(nn.Module):
                 sparse_ratio=adaptive_graph_cfg['sparse_ratio'],
                 directed=adaptive_graph_cfg['directed']
             )
-            self.spatial_conv = AdaptiveChebConv(
+            # 修复：传递了明确的 in_channels 输入特征
+            self.spatial_conv = AdaptiveDiffusionConv(
+                in_channels=in_channels,
                 num_of_filters=num_of_chev_filters,
                 K=K,
                 num_of_vertices=num_of_vertices,
@@ -100,14 +99,15 @@ class UpgradeASTGCNBlock(nn.Module):
                 e_layers=transformer_cfg['e_layers'],
                 dropout=transformer_cfg['dropout'],
                 max_len=transformer_cfg['max_len'],
-                topk_ratio=transformer_cfg['topk_ratio']
+                factor=transformer_cfg.get('factor', 5)
             )
             self.transformer_out = nn.Linear(transformer_cfg['d_model'], num_of_time_filters)
 
-        self.residual_conv = nn.LazyConv2d(
+        self.residual_conv = nn.Conv2d(
+            in_channels=in_channels,
             out_channels=num_of_time_filters,
             kernel_size=(1, 1),
-            stride=(1, time_conv_strides)
+            stride=(1, time_conv_strides) if temporal_mode == 0 else 1
         )
         self.ln = nn.LayerNorm(num_of_time_filters)
 
@@ -125,14 +125,24 @@ class UpgradeASTGCNBlock(nn.Module):
         else:
             b, n, c, t = spatial_gcn.shape
             time_features = None
-            if x.shape[2] >= 2:
+            if x.shape[2] >= 2: # 剥离时间的辅助特征维度的输入
                 time_features = x[:, :, -2:, :].permute(0, 1, 3, 2).reshape(b * n, t, 2)
+            
             transformer_in = spatial_gcn.permute(0, 1, 3, 2).reshape(b * n, t, c)
             transformer_out = self.transformer(transformer_in, time_features=time_features)
             transformer_out = self.transformer_out(transformer_out)
-            time_conv_output = transformer_out.reshape(b, n, t, -1).permute(0, 1, 3, 2)
+            
+            t_new = transformer_out.shape[1]
+            time_conv_output = transformer_out.reshape(b, n, t_new, -1).permute(0, 1, 3, 2)
 
         x_residual = self.residual_conv(x.permute(0, 2, 1, 3)).permute(0, 2, 1, 3)
+        
+        # 兼容蒸馏操作改变的时间轴维度长度
+        if self.temporal_mode != 0:
+            t_new = time_conv_output.shape[-1]
+            if x_residual.shape[-1] != t_new:
+                x_residual = F.interpolate(x_residual, size=t_new, mode='nearest')
+                
         output = F.relu(x_residual + time_conv_output)
         output = output.permute(0, 3, 1, 2)
         output = self.ln(output)
@@ -141,12 +151,15 @@ class UpgradeASTGCNBlock(nn.Module):
 
 
 class UpgradeASTGCNSubmodule(nn.Module):
-    def __init__(self, num_for_prediction, backbones, num_of_vertices,
+    def __init__(self, in_channels, num_for_prediction, backbones, num_of_vertices,
                  spatial_mode, temporal_mode, adaptive_graph_cfg, transformer_cfg):
         super(UpgradeASTGCNSubmodule, self).__init__()
         self.blocks = nn.ModuleList()
+        current_channels = in_channels
+        
         for backbone in backbones:
             self.blocks.append(UpgradeASTGCNBlock(
+                in_channels=current_channels,
                 backbone=backbone,
                 num_of_vertices=num_of_vertices,
                 spatial_mode=spatial_mode,
@@ -154,36 +167,51 @@ class UpgradeASTGCNSubmodule(nn.Module):
                 adaptive_graph_cfg=adaptive_graph_cfg,
                 transformer_cfg=transformer_cfg
             ))
+            current_channels = backbone['num_of_time_filters']
 
-        self.final_conv = nn.LazyConv2d(
-            out_channels=num_for_prediction,
-            kernel_size=(1, backbones[-1]['num_of_time_filters'])
-        )
-        self.W = None
+        # 修复致命错误 RuntimeError：抛弃了僵化的 Conv2d
+        # 通过 LazyLinear 在 forward 时自动推断 (C * T_剩余) 的大小，映射到目标长序列预测(如 36)，从根源解决输入维度报错
+        self.final_linear = nn.LazyLinear(num_for_prediction)
+        
+        # 修复：提前进行 W 初始化，消灭 forward() 里声明 Parameter
+        self.W = nn.Parameter(torch.empty(num_of_vertices, num_for_prediction))
+        nn.init.xavier_uniform_(self.W.unsqueeze(0))
 
     def forward(self, x):
         for block in self.blocks:
             x = block(x)
-        module_output = self.final_conv(x.permute(0, 2, 1, 3))[:, :, :, -1].permute(0, 2, 3, 1)
-        if self.W is None:
-            self.W = nn.Parameter(torch.empty(module_output.shape[2], device=x.device, dtype=x.dtype))
-            nn.init.xavier_uniform_(self.W.unsqueeze(0))
+            
+        b, n, c, t = x.shape
+        # 将被压缩好的时间与通道全部展平 -> (Batch, N, C_out * T_out)
+        x_flat = x.reshape(b, n, c * t)
+        
+        # 映射到未来生成式预测
+        module_output = self.final_linear(x_flat)
+        
         return module_output * self.W
 
 
 class UpgradeASTGCN(nn.Module):
-    def __init__(self, num_for_prediction, all_backbones, num_of_vertices,
+    def __init__(self, num_of_features, num_for_prediction, all_backbones, num_of_vertices,
                  spatial_mode, temporal_mode, adaptive_graph_cfg, transformer_cfg):
         super(UpgradeASTGCN, self).__init__()
         self.submodules = nn.ModuleList()
+        
         for backbones in all_backbones:
             self.submodules.append(UpgradeASTGCNSubmodule(
-                num_for_prediction, backbones, num_of_vertices,
-                spatial_mode, temporal_mode, adaptive_graph_cfg, transformer_cfg
+                in_channels=num_of_features, # 传入初始数据的特征数 (例如速度1+时间特征2 = 3维特征)
+                num_for_prediction=num_for_prediction,
+                backbones=backbones,
+                num_of_vertices=num_of_vertices,
+                spatial_mode=spatial_mode,
+                temporal_mode=temporal_mode,
+                adaptive_graph_cfg=adaptive_graph_cfg,
+                transformer_cfg=transformer_cfg
             ))
 
     def forward(self, x_list):
-        submodule_outputs = []
+        submodule_outputs =[]
         for idx in range(len(x_list)):
             submodule_outputs.append(self.submodules[idx](x_list[idx]))
         return torch.stack(submodule_outputs, dim=0).sum(dim=0)
+        
