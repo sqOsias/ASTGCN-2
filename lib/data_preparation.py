@@ -106,38 +106,59 @@ def read_and_generate_dataset(graph_signal_matrix_filename,
             data_seq.shape[0], data_seq.shape[1], points_per_hour, data_seq.dtype)
         data_seq = np.concatenate([data_seq, time_features], axis=2)
 
-    all_samples = []
+    # 首先找出所有有效的样本索引
+    valid_indices = []
     for idx in range(data_seq.shape[0]):
-        sample = get_sample_indices(data_seq, num_of_weeks, num_of_days,
-                                    num_of_hours, idx, num_for_predict,
-                                    points_per_hour)
-        if not sample:
-            continue
-
-        week_sample, day_sample, hour_sample, target = sample
-        all_samples.append((
-            np.expand_dims(week_sample, axis=0).transpose((0, 2, 3, 1)),
-            np.expand_dims(day_sample, axis=0).transpose((0, 2, 3, 1)),
-            np.expand_dims(hour_sample, axis=0).transpose((0, 2, 3, 1)),
-            np.expand_dims(target, axis=0).transpose((0, 2, 3, 1))[:, :, 2, :]
-        ))
-
-    split_line1 = int(len(all_samples) * 0.6)
-    split_line2 = int(len(all_samples) * 0.8)
-
+        # 先检查是否能生成有效样本，而不实际生成数据
+        sample_check = get_sample_indices(data_seq, num_of_weeks, num_of_days,
+                                          num_of_hours, idx, num_for_predict,
+                                          points_per_hour, only_check=True)
+        if sample_check:
+            valid_indices.append(idx)
+    
+    print(f'Total valid samples: {len(valid_indices)}')
+    
+    # 计算分割点
+    split_line1 = int(len(valid_indices) * 0.6)
+    split_line2 = int(len(valid_indices) * 0.8)
+    
+    # 分批处理数据以节省内存
+    def process_batch(indices):
+        batch_samples = []
+        for idx in indices:
+            sample = get_sample_indices(data_seq, num_of_weeks, num_of_days,
+                                        num_of_hours, idx, num_for_predict,
+                                        points_per_hour)
+            if sample:
+                week_sample, day_sample, hour_sample, target = sample
+                batch_samples.append((
+                    np.expand_dims(week_sample, axis=0).transpose((0, 2, 3, 1)),
+                    np.expand_dims(day_sample, axis=0).transpose((0, 2, 3, 1)),
+                    np.expand_dims(hour_sample, axis=0).transpose((0, 2, 3, 1)),
+                    np.expand_dims(target, axis=0).transpose((0, 2, 3, 1))[:, :, 2, :]
+                ))
+        if batch_samples:
+            return [np.concatenate(i, axis=0) for i in zip(*batch_samples)]
+        else:
+            return [np.array([]) for _ in range(4)]  # 返回空数组列表
+    
+    # 处理训练集
     if not merge:
-        training_set = [np.concatenate(i, axis=0)
-                        for i in zip(*all_samples[:split_line1])]
+        train_indices = valid_indices[:split_line1]
     else:
         print('Merge training set and validation set!')
-        training_set = [np.concatenate(i, axis=0)
-                        for i in zip(*all_samples[:split_line2])]
-
-    validation_set = [np.concatenate(i, axis=0)
-                      for i in zip(*all_samples[split_line1: split_line2])]
-    testing_set = [np.concatenate(i, axis=0)
-                   for i in zip(*all_samples[split_line2:])]
-
+        train_indices = valid_indices[:split_line2]
+    
+    training_set = process_batch(train_indices)
+    
+    # 处理验证集
+    val_indices = valid_indices[split_line1:split_line2]
+    validation_set = process_batch(val_indices)
+    
+    # 处理测试集
+    test_indices = valid_indices[split_line2:]
+    testing_set = process_batch(test_indices)
+    
     train_week, train_day, train_hour, train_target = training_set
     val_week, val_day, val_hour, val_target = validation_set
     test_week, test_day, test_hour, test_target = testing_set

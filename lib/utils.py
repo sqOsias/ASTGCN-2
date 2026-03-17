@@ -54,7 +54,7 @@ def search_data(sequence_length, num_of_batches, label_start_idx,
 
 
 def get_sample_indices(data_sequence, num_of_weeks, num_of_days, num_of_hours,
-                       label_start_idx, num_for_predict, points_per_hour=12):
+                       label_start_idx, num_for_predict, points_per_hour=12, only_check=False):
     '''
     Parameters
     ----------
@@ -69,6 +69,9 @@ def get_sample_indices(data_sequence, num_of_weeks, num_of_days, num_of_hours,
                      the number of points will be predicted for each sample
 
     points_per_hour: int, default 12, number of points per hour
+    
+    only_check: boolean, default False
+                if True, only check if sample can be generated without creating arrays
 
     Returns
     ----------
@@ -104,6 +107,10 @@ def get_sample_indices(data_sequence, num_of_weeks, num_of_days, num_of_hours,
                                1, points_per_hour)
     if not hour_indices:
         return None
+    
+    if only_check:
+        # 如果只是检查，直接返回True表示可以生成样本
+        return True
 
     week_sample = np.concatenate([data_sequence[i: j]
                                   for i, j in week_indices], axis=0)
