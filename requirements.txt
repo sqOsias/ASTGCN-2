@@ -1,0 +1,5 @@
+scipy
+torch
+tensorboard
+pytest
+pytest-xdist

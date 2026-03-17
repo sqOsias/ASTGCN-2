@@ -1,0 +1,11 @@
+*.pyc
+*.params
+experiment*/
+__pycache__/
+ASTGCN*/
+venv/
+.vscode/
+.pytest_cache/
+*.json
+
+*.pth
