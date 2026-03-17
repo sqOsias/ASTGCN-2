@@ -26,8 +26,8 @@ from lib.data_preparation import read_and_generate_dataset
 from model.model_config import get_backbones
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--config", type=str,
-                    help="configuration file path", required=True)
+parser.add_argument("--config", type=str,default="configurations/PEMS04.conf",
+                    help="configuration file path", required=False)
 parser.add_argument("--force", type=str, default=False,
                     help="remove params dir", required=False)
 args = parser.parse_args()
@@ -213,47 +213,65 @@ def run_training_block(params_path, model_name, model, ctx, optimizer, learning_
                                          points_per_hour,
                                          merge)
 
+    # true_value 将在删除 all_data 之前创建
+    # true_value = (all_data['test']['target'].transpose((0, 2, 1))
+    #               .reshape(all_data['test']['target'].shape[0], -1))
+
+    # 提取统计信息
+    stats_data = {}
+    for type_ in ['week', 'day', 'recent']:
+        stats = all_data['stats'][type_]
+        stats_data[type_ + '_mean'] = stats['mean'].copy()  # 创建副本以避免引用问题
+        stats_data[type_ + '_std'] = stats['std'].copy()
+
+    # 提取特征数量用于模型初始化
+    num_of_features = all_data['train']['recent'].shape[-2]  # 获取输入数据的特征维度 (倒数第二维)
+
+    # 为减少内存使用，仅将小批量数据加载到设备
+    # 首先将数据转为tensor但暂不移动到设备
+    train_week_tensor = torch.from_numpy(all_data['train']['week']).float()
+    train_day_tensor = torch.from_numpy(all_data['train']['day']).float()
+    train_recent_tensor = torch.from_numpy(all_data['train']['recent']).float()
+    train_target_tensor = torch.from_numpy(all_data['train']['target']).float()
+
+    val_week_tensor = torch.from_numpy(all_data['val']['week']).float()
+    val_day_tensor = torch.from_numpy(all_data['val']['day']).float()
+    val_recent_tensor = torch.from_numpy(all_data['val']['recent']).float()
+    val_target_tensor = torch.from_numpy(all_data['val']['target']).float()
+
+    test_week_tensor = torch.from_numpy(all_data['test']['week']).float()
+    test_day_tensor = torch.from_numpy(all_data['test']['day']).float()
+    test_recent_tensor = torch.from_numpy(all_data['test']['recent']).float()
+    test_target_tensor = torch.from_numpy(all_data['test']['target']).float()
+
+    # 保存测试目标数据用于后续评估
+    test_target_np = all_data['test']['target']
     true_value = (all_data['test']['target'].transpose((0, 2, 1))
                   .reshape(all_data['test']['target'].shape[0], -1))
 
+    # 删除原始数据以释放内存
+    del all_data
+
+    # 创建数据加载器，但不在这里将数据移到设备
     train_loader = DataLoader(
-        TensorDataset(
-            torch.tensor(all_data['train']['week'], dtype=torch.float32, device=ctx),
-            torch.tensor(all_data['train']['day'], dtype=torch.float32, device=ctx),
-            torch.tensor(all_data['train']['recent'], dtype=torch.float32, device=ctx),
-            torch.tensor(all_data['train']['target'], dtype=torch.float32, device=ctx)
-        ),
+        TensorDataset(train_week_tensor, train_day_tensor, train_recent_tensor, train_target_tensor),
         batch_size=batch_size,
         shuffle=True
     )
 
     val_loader = DataLoader(
-        TensorDataset(
-            torch.tensor(all_data['val']['week'], dtype=torch.float32, device=ctx),
-            torch.tensor(all_data['val']['day'], dtype=torch.float32, device=ctx),
-            torch.tensor(all_data['val']['recent'], dtype=torch.float32, device=ctx),
-            torch.tensor(all_data['val']['target'], dtype=torch.float32, device=ctx)
-        ),
+        TensorDataset(val_week_tensor, val_day_tensor, val_recent_tensor, val_target_tensor),
         batch_size=batch_size,
         shuffle=False
     )
 
     test_loader = DataLoader(
-        TensorDataset(
-            torch.tensor(all_data['test']['week'], dtype=torch.float32, device=ctx),
-            torch.tensor(all_data['test']['day'], dtype=torch.float32, device=ctx),
-            torch.tensor(all_data['test']['recent'], dtype=torch.float32, device=ctx),
-            torch.tensor(all_data['test']['target'], dtype=torch.float32, device=ctx)
-        ),
+        TensorDataset(test_week_tensor, test_day_tensor, test_recent_tensor, test_target_tensor),
         batch_size=batch_size,
         shuffle=False
     )
 
-    stats_data = {}
-    for type_ in ['week', 'day', 'recent']:
-        stats = all_data['stats'][type_]
-        stats_data[type_ + '_mean'] = stats['mean']
-        stats_data[type_ + '_std'] = stats['std']
+    # 保存统计信息
     stats_npz_path = os.path.join(params_path, 'stats_data.npz')
     stats_npz_artifact_path = os.path.join(artifacts_dir, 'stats_data.npz')
     save_npz(stats_npz_path, **stats_data)
@@ -271,6 +289,10 @@ def run_training_block(params_path, model_name, model, ctx, optimizer, learning_
         if os.path.exists(legacy_path):
             os.remove(legacy_path)
 
+    # 训练时再将批次数据移动到设备（如果使用GPU）
+    if str(ctx).startswith('cuda'):
+        print("注意: 使用GPU训练，将在训练循环中动态移动数据到GPU以节省内存")
+
     loss_function = nn.MSELoss(reduction='none')
 
     all_backbones = get_backbones(args.config, adj_filename, ctx)
@@ -282,15 +304,18 @@ def run_training_block(params_path, model_name, model, ctx, optimizer, learning_
     else:
         from model.upgrade.astgcn_upgrade import UpgradeASTGCN
         net = UpgradeASTGCN(
-            num_for_predict,
-            all_backbones,
-            num_of_vertices,
-            spatial_mode,
-            temporal_mode,
-            adaptive_graph_cfg,
-            transformer_cfg
+            num_of_features,      # 输入特征数量
+            num_for_predict,      # 预测时间步数
+            all_backbones,        # 骨干网络配置
+            num_of_vertices,      # 节点数量
+            spatial_mode,         # 空间模式
+            temporal_mode,        # 时间模式
+            adaptive_graph_cfg,   # 自适应图配置
+            transformer_cfg       # Transformer配置
         ).to(ctx)
     for val_w, val_d, val_r, val_t in val_loader:
+        # 将数据移动到正确的设备
+        val_w, val_d, val_r = val_w.to(ctx), val_d.to(ctx), val_r.to(ctx)
         net([val_w, val_d, val_r])
         break
     for name, param in net.named_parameters():
@@ -331,6 +356,9 @@ def run_training_block(params_path, model_name, model, ctx, optimizer, learning_
         for train_w, train_d, train_r, train_t in train_loader:
             start_time = time()
 
+            # 将数据移动到正确的设备
+            train_w, train_d, train_r, train_t = train_w.to(ctx), train_d.to(ctx), train_r.to(ctx), train_t.to(ctx)
+
             with torch.set_grad_enabled(True):
                 output = net([train_w, train_d, train_r])
                 l = 0.5 * loss_function(output, train_t)
@@ -342,7 +370,7 @@ def run_training_block(params_path, model_name, model, ctx, optimizer, learning_
 
             sw.add_scalar('training_loss', training_loss, global_step)
 
-            if global_step % 50 == 0:
+            if global_step % 100 == 0:
                 print('global step: %s, training loss: %.2f, time: %.2fs'
                       % (global_step, training_loss, time() - start_time))
             with open(train_loss_csv, 'a', newline='') as f:
@@ -381,7 +409,7 @@ def run_training_block(params_path, model_name, model, ctx, optimizer, learning_
             save_npz(
                 test_results_path,
                 prediction=prediction,
-                ground_truth=all_data['test']['target'],
+                ground_truth=test_target_np,
                 epoch=np.array(epoch, dtype=np.int64),
                 validation_loss=np.array(best_val_loss, dtype=np.float64)
             )
@@ -527,4 +555,3 @@ if __name__ == "__main__":
                                        epochs, batch_size, num_of_weeks, num_of_days, num_of_hours,
                                        merge, seed, timestamp, spatial_mode, temporal_mode,
                                        adaptive_graph_cfg, transformer_cfg, horizons)
-

@@ -24,11 +24,18 @@ class AdaptiveDiffusionConv(nn.Module):
         
         adj = self.adaptive_graph()
         if spatial_attention is not None:
-            adj = adj.unsqueeze(0) * spatial_attention
+            # 确保 spatial_attention 与 adj 形状兼容
+            if spatial_attention.dim() == 3:
+                # 如果 spatial_attention 已经是 (batch_size, num_of_vertices, num_of_vertices)
+                adj = adj.unsqueeze(0) * spatial_attention
+            else:
+                # 如果 spatial_attention 是 (num_of_vertices, num_of_vertices)，则扩展到批次
+                adj = adj.unsqueeze(0) * spatial_attention.unsqueeze(0).expand(batch_size, -1, -1)
         else:
             adj = adj.unsqueeze(0).expand(batch_size, -1, -1)
 
-        eye = torch.eye(num_of_vertices, device=x.device, dtype=x.dtype).unsqueeze(0)
+        # 修复：确保 eye 矩阵也扩展到相同批次大小
+        eye = torch.eye(num_of_vertices, device=x.device, dtype=x.dtype).unsqueeze(0).expand(batch_size, -1, -1)
         supports = [eye, adj]
         for _ in range(2, self.K):
             supports.append(torch.matmul(supports[-1], adj))
@@ -137,12 +144,29 @@ class UpgradeASTGCNBlock(nn.Module):
 
         x_residual = self.residual_conv(x.permute(0, 2, 1, 3)).permute(0, 2, 1, 3)
         
+        # 确保 x_residual 和 time_conv_output 形状完全匹配
         # 兼容蒸馏操作改变的时间轴维度长度
         if self.temporal_mode != 0:
             t_new = time_conv_output.shape[-1]
             if x_residual.shape[-1] != t_new:
                 x_residual = F.interpolate(x_residual, size=t_new, mode='nearest')
-                
+        
+        # 额外确保通道维度也匹配（防止任何可能的维度不匹配）
+        if x_residual.shape[2] != time_conv_output.shape[2]:
+            # 如果通道数不匹配，调整x_residual的通道数以匹配time_conv_output
+            target_channels = time_conv_output.shape[2]
+            current_channels = x_residual.shape[2]
+            if target_channels < current_channels:
+                # 如果目标通道数较小，截取前面的通道
+                x_residual = x_residual[:, :, :target_channels, :]
+            elif target_channels > current_channels:
+                # 如果目标通道数较大，用零填充
+                pad_size = target_channels - current_channels
+                zeros_pad = torch.zeros(x_residual.shape[0], x_residual.shape[1], 
+                                        pad_size, x_residual.shape[3], 
+                                        device=x_residual.device, dtype=x_residual.dtype)
+                x_residual = torch.cat([x_residual, zeros_pad], dim=2)
+        
         output = F.relu(x_residual + time_conv_output)
         output = output.permute(0, 3, 1, 2)
         output = self.ln(output)
@@ -214,4 +238,3 @@ class UpgradeASTGCN(nn.Module):
         for idx in range(len(x_list)):
             submodule_outputs.append(self.submodules[idx](x_list[idx]))
         return torch.stack(submodule_outputs, dim=0).sum(dim=0)
-        

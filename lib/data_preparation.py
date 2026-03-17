@@ -171,6 +171,9 @@ def read_and_generate_dataset(graph_signal_matrix_filename,
     print('testing data: week: {}, day: {}, recent: {}, target: {}'.format(
         test_week.shape, test_day.shape, test_hour.shape, test_target.shape))
 
+    # 清理临时变量以释放内存
+    del training_set, validation_set, testing_set
+
     (week_stats, train_week_norm,
      val_week_norm, test_week_norm) = normalization(train_week,
                                                     val_week,

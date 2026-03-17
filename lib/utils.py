@@ -225,10 +225,14 @@ def compute_val_loss(net, val_loader, loss_function, sw, epoch):
     net.eval()
     with torch.no_grad():  # MXNet:inference without autograd.record → PyTorch:torch.no_grad
         for index, (val_w, val_d, val_r, val_t) in enumerate(val_loader):
+            # 获取模型所在的设备
+            device = next(net.parameters()).device
+            # 将数据移动到模型所在的设备
+            val_w, val_d, val_r, val_t = val_w.to(device), val_d.to(device), val_r.to(device), val_t.to(device)
             output = net([val_w, val_d, val_r])
             l = loss_function(output, val_t)
             tmp.extend(l.detach().cpu().numpy().reshape(-1).tolist())  # MXNet:l.asnumpy() → PyTorch:l.detach().cpu().numpy()
-            if index % 20 == 0:
+            if index % 100 == 0:
                 print('validation batch %s / %s, loss: %.2f' % (
                     index + 1, val_loader_length, l.mean().item()))  # MXNet:asscalar() → PyTorch:item()
 
@@ -260,8 +264,12 @@ def predict(net, test_loader):
     net.eval()
     with torch.no_grad():  # MXNet:inference without autograd.record → PyTorch:torch.no_grad
         for index, (test_w, test_d, test_r, _) in enumerate(test_loader):
+            # 获取模型所在的设备
+            device = next(net.parameters()).device
+            # 将数据移动到模型所在的设备
+            test_w, test_d, test_r = test_w.to(device), test_d.to(device), test_r.to(device)
             prediction.append(net([test_w, test_d, test_r]).detach().cpu().numpy())  # MXNet:asnumpy() → PyTorch:detach().cpu().numpy()
-            if index % 20 == 0:
+            if index % 100 == 0:
                 print('predicting testing set batch %s / %s' % (index + 1,
                                                             test_loader_length))
     prediction = np.concatenate(prediction, 0)
