@@ -106,4 +106,4 @@ def summarize_experiments(base_dir="results", output_csv="experiment_summary.csv
 if __name__ == "__main__":
     # 确保基础路径是你实际保存的 results 或 params 目录
     # 注意：根据你的截图，目录叫 'results'
-    summarize_experiments(base_dir="results", output_csv="experiment_summary.csv")s
+    summarize_experiments(base_dir="results", output_csv="experiment_summary.csv")

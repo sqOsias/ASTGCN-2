@@ -6,6 +6,8 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader, TensorDataset
+import csv
+
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from models.lstm_model import LSTMPredictor
@@ -121,6 +123,13 @@ def train(args):
     print(f"MAE: {mae:.2f}")
     print(f"RMSE: {rmse:.2f}")
     print(f"MAPE: {mape:.2f}%")
+
+    test_metrics_csv = os.path.join('baselines', 'results', 'lstm_test_metrics.csv')
+    os.makedirs(os.path.dirname(test_metrics_csv), exist_ok=True)
+
+    with open(test_metrics_csv, 'a', newline='') as f:
+        writer = csv.writer(f)
+        writer.writerow([args.sensor_id, args.seq_len, args.horizon, mae, rmse, mape])
 
     results_dir = os.path.join('baselines', 'results')
     os.makedirs(results_dir, exist_ok=True)
