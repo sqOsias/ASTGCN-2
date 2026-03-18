@@ -15,11 +15,6 @@ from torch import nn  # MXNet:from mxnet import gluon → PyTorch:from torch imp
 from torch.utils.data import TensorDataset, DataLoader  # MXNet:gluon.data.ArrayDataset/DataLoader → PyTorch:TensorDataset/DataLoader
 from torch.utils.tensorboard import SummaryWriter  # MXNet:from mxboard import SummaryWriter → PyTorch:torch.utils.tensorboard.SummaryWriter
 
-# Patch deprecated numpy types for compatibility with newer numpy versions
-np.bool = bool
-np.int = int
-np.float = float
-np.object = object
 
 from lib.utils import compute_val_loss, evaluate, predict
 from lib.data_preparation import read_and_generate_dataset
@@ -538,7 +533,7 @@ if __name__ == "__main__":
                     if 'params_dir' in training_config and training_config['params_dir'] != "None" and training_config['params_dir'] != "":
                         params_path = os.path.join(training_config['params_dir'], group_tag, run_tag)
                     else:
-                        params_path = os.path.join('params', group_tag, run_tag)
+                        params_path = os.path.join('results', group_tag, run_tag)
 
                     if os.path.exists(params_path) and not args.force:
                         raise SystemExit("Params folder exists! Select a new params path please!")

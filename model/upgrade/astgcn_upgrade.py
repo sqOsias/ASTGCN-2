@@ -124,10 +124,12 @@ class UpgradeASTGCNBlock(nn.Module):
 
         if self.temporal_mode == 0:
             temporal_at = self.TAt(x)
+            b, n, c, t = spatial_gcn.shape
+            # [修复]：正确合并 Node 和 Channel 维度，保留 Time 维度在末尾进行矩阵乘法
             spatial_gcn = torch.matmul(
-                spatial_gcn.reshape(spatial_gcn.shape[0], spatial_gcn.shape[1], -1),
+                spatial_gcn.reshape(b, -1, t),
                 temporal_at
-            ).reshape(spatial_gcn.shape[0], spatial_gcn.shape[1], spatial_gcn.shape[2], -1)
+            ).reshape(b, n, c, t)
             time_conv_output = self.time_conv(spatial_gcn.permute(0, 2, 1, 3)).permute(0, 2, 1, 3)
         else:
             b, n, c, t = spatial_gcn.shape
