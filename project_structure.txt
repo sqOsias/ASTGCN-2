@@ -1,0 +1,24 @@
+ASTGCN-2/
+├── backend/
+│   ├── __init__.py
+│   ├── app.py                 # FastAPI 主应用
+│   ├── models/
+│   │   ├── __init__.py
+│   │   ├── inference_engine.py # 推理引擎
+│   │   └── sliding_window.py   # 滑动窗口数据结构
+│   ├── api/
+│   │   ├── __init__.py
+│   │   └── websocket.py       # WebSocket路由
+│   ├── utils/
+│   │   ├── __init__.py
+│   │   └── data_processor.py  # 数据预处理器
+│   └── config.py              # 配置文件
+├── frontend/
+│   ├── index.html
+│   ├── static/
+│   │   ├── css/
+│   │   ├── js/
+│   │   └── assets/
+│   └── templates/
+└── data/
+    └── processed/             # 处理后的数据
