@@ -8,6 +8,7 @@ import os
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
+import sys
 
 import numpy as np
 import torch
@@ -205,12 +206,277 @@ async def startup_event():
     
     # 初始化模型
     try:
-        # 需要从 model_config 获取 backbones 配置
+        # 优先从训练结果目录加载已训练的模型
+        trained_model_path = "/root/ASTGCN-2/results/ASTGCN_lr0p001/0_0_20260318033244"  # 默认路径
+        
+        if os.path.exists(trained_model_path):
+            # 使用新的模型加载工具
+            # 内部实现模型加载功能，因为model_loader模块尚未创建
+            def load_model_from_path_integrated(model_path: str):
+                import json
+                import configparser
+                import yaml
+                from pathlib import Path
+                
+                model_path = Path(model_path)
+                
+                # 检查路径是否存在
+                if not model_path.exists():
+                    raise FileNotFoundError(f"模型路径不存在: {model_path}")
+                
+                # 寻找配置文件和权重文件
+                checkpoints_dir = model_path / "checkpoints"
+                configs_dir = model_path / "configs"
+                
+                if not checkpoints_dir.exists():
+                    raise FileNotFoundError(f"找不到checkpoints目录: {checkpoints_dir}")
+                
+                if not configs_dir.exists():
+                    raise FileNotFoundError(f"找不到configs目录: {configs_dir}")
+                
+                # 寻找模型权重文件
+                weight_files = list(checkpoints_dir.glob("*.pth"))
+                if not weight_files:
+                    raise FileNotFoundError(f"在 {checkpoints_dir} 中找不到.pth权重文件")
+                
+                # 优先使用best_model.pth
+                best_model = checkpoints_dir / "best_model.pth"
+                if best_model.exists():
+                    weight_path = best_model
+                else:
+                    weight_path = weight_files[0]  # 使用第一个找到的权重文件
+                
+                # 寻找配置文件 (优先级: resolved_config.json > config.yaml > train.conf)
+                config_data = None
+                
+                resolved_config = configs_dir / "resolved_config.json"
+                if resolved_config.exists():
+                    with open(resolved_config, 'r', encoding='utf-8') as f:
+                        config_data = json.load(f)
+                else:
+                    config_yaml = configs_dir / "config.yaml"
+                    if config_yaml.exists():
+                        with open(config_yaml, 'r', encoding='utf-8') as f:
+                            config_data = yaml.safe_load(f)
+                    else:
+                        train_conf = configs_dir / "train.conf"
+                        if train_conf.exists():
+                            config_data = parse_ini_config_internal(train_conf)
+                
+                if config_data is None:
+                    raise FileNotFoundError(f"在 {configs_dir} 中找不到任何配置文件")
+                
+                # 从配置中提取模型参数
+                model_params = extract_model_params_from_config_internal(config_data)
+                
+                # 创建模型实例
+                model_instance = UpgradeASTGCN(**model_params)
+                
+                # 加载权重
+                device_local = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+                state_dict = torch.load(str(weight_path), map_location=device_local, weights_only=True)
+                
+                # 修复state_dict的键名（如果需要）
+                model_state_dict = model_instance.state_dict()
+                updated_state_dict = {}
+                
+                for key, value in state_dict.items():
+                    # 如果state_dict中的键在model_state_dict中不存在，尝试去掉前缀
+                    if key in model_state_dict:
+                        updated_state_dict[key] = value
+                    elif key.startswith('module.') and key[7:] in model_state_dict:
+                        # 去掉DataParallel的module.前缀
+                        updated_state_dict[key[7:]] = value
+                    elif key.startswith('model.') and key[6:] in model_state_dict:
+                        # 去掉model.前缀
+                        updated_state_dict[key[6:]] = value
+                    else:
+                        # 尝试直接匹配
+                        updated_state_dict[key] = value
+                
+                # 加载权重
+                model_instance.load_state_dict(updated_state_dict, strict=False)
+                model_instance.to(device_local)
+                model_instance.eval()
+                
+                print(f"成功加载模型权重: {weight_path}")
+                print(f"模型配置: {model_params}")
+                
+                return model_instance, config_data
+            
+            
+            def parse_ini_config_internal(config_file):
+                """解析INI格式的配置文件"""
+                config = configparser.ConfigParser()
+                config.read(str(config_file))
+                
+                config_dict = {}
+                
+                for section_name in config.sections():
+                    section = {}
+                    for key, value in config.items(section_name):
+                        # 尝试转换数值类型
+                        section[key] = convert_value_type_internal(value)
+                    config_dict[section_name] = section
+                
+                return config_dict
+            
+            
+            def convert_value_type_internal(value: str):
+                """尝试将字符串值转换为适当的Python类型"""
+                value = value.strip()
+                
+                # 尝试转换为布尔值
+                if value.lower() in ('true', 'yes', 'on', '1'):
+                    return True
+                elif value.lower() in ('false', 'no', 'off', '0'):
+                    return False
+                
+                # 尝试转换为整数
+                try:
+                    if '.' not in value:
+                        return int(value)
+                except ValueError:
+                    pass
+                
+                # 尝试转换为浮点数
+                try:
+                    return float(value)
+                except ValueError:
+                    pass
+                
+                # 返回原始字符串
+                return value
+            
+            
+            def extract_model_params_from_config_internal(config_data):
+                """从配置数据中提取模型参数"""
+                # 从Data部分提取基本信息
+                data_config = config_data.get('Data', {})
+                training_config = config_data.get('Training', {})
+                model_upgrade_config = config_data.get('ModelUpgrade', {})
+                
+                # 提取必要参数
+                num_of_vertices = int(data_config.get('num_of_vertices', 307))
+                num_for_predict = int(data_config.get('num_for_predict', 12))
+                
+                # 从Training部分获取特征数（通常由数据决定）
+                # PEMS数据集通常有3个特征：流量、速度、占有率
+                num_of_features = 3  # PEMS数据集一般有3个特征
+                
+                # 从ModelUpgrade部分获取高级配置
+                adaptive_graph_config = model_upgrade_config.get('adaptive_graph', {})
+                transformer_config = model_upgrade_config.get('transformer', {})
+                
+                # 获取空间和时间模式
+                spatial_mode = model_upgrade_config.get('spatial_mode', 0)
+                temporal_mode = model_upgrade_config.get('temporal_mode', 0)
+                
+                # 构建adaptive_graph_cfg
+                adaptive_graph_cfg = {
+                    'embedding_dim': adaptive_graph_config.get('embedding_dim', 10),
+                    'sparse_ratio': adaptive_graph_config.get('sparse_ratio', 0.2),
+                    'directed': adaptive_graph_config.get('directed', True)
+                }
+                
+                # 构建transformer_cfg
+                transformer_cfg = {
+                    'd_model': transformer_config.get('d_model', 32),
+                    'n_heads': transformer_config.get('n_heads', 2),
+                    'e_layers': transformer_config.get('e_layers', 2),
+                    'dropout': transformer_config.get('dropout', 0.1),
+                    'max_len': transformer_config.get('max_len', 36),
+                    'factor': transformer_config.get('topk_ratio', 0.5) * 10  # 转换为factor
+                }
+                
+                # 获取邻接矩阵文件路径以构建backbones
+                adj_filename = data_config.get('adj_filename', 'data/PEMS04/distance.csv')
+                device_local = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+                
+                # 导入配置函数来获取backbones
+                from model.model_config import get_backbones
+                try:
+                    all_backbones_local = get_backbones('configurations/PEMS04.conf', adj_filename, device_local)
+                except Exception as e:
+                    print(f"警告: 无法加载backbones配置，使用空列表: {e}")
+                    all_backbones_local = []
+                
+                # 构建模型参数
+                model_params = {
+                    'num_of_features': num_of_features,
+                    'num_for_prediction': num_for_predict,
+                    'all_backbones': all_backbones_local,
+                    'num_of_vertices': num_of_vertices,
+                    'spatial_mode': spatial_mode,
+                    'temporal_mode': temporal_mode,
+                    'adaptive_graph_cfg': adaptive_graph_cfg,
+                    'transformer_cfg': transformer_cfg
+                }
+                
+                return model_params
+            
+            # 使用内联实现的模型加载功能
+            model, loaded_config = load_model_from_path_integrated(trained_model_path)
+            logger.info(f"从 {trained_model_path} 成功加载预训练模型")
+            model, loaded_config = load_model_from_path(trained_model_path)
+            logger.info(f"从 {trained_model_path} 成功加载预训练模型")
+        else:
+            # 如果没有找到训练好的模型，则使用原来的初始化方法
+            from model.model_config import get_backbones
+            all_backbones = get_backbones('configurations/PEMS04.conf', DATA_CONFIG['distance_path'], device)
+            
+            model = UpgradeASTGCN(
+                num_of_features=3,  # 根据数据集特征数设定 (PEMS04数据集有3个特征)
+                num_for_prediction=MODEL_CONFIG['num_for_prediction'],
+                all_backbones=all_backbones,
+                num_of_vertices=MODEL_CONFIG['num_of_vertices'],
+                spatial_mode=MODEL_CONFIG['spatial_mode'],
+                temporal_mode=MODEL_CONFIG['temporal_mode'],
+                adaptive_graph_cfg={
+                    'embedding_dim': 10,
+                    'sparse_ratio': 0.2,
+                    'directed': True
+                },
+                transformer_cfg={
+                    'd_model': 32,
+                    'n_heads': 2,
+                    'e_layers': 2,
+                    'dropout': 0.1,
+                    'max_len': 36,
+                    'factor': 5
+                }
+            )
+            
+            # 尝试加载旧的预训练权重作为备选
+            param_dir = Path("params")
+            if param_dir.exists():
+                checkpoint_files = list(param_dir.rglob("*net_*.params"))
+                if checkpoint_files:
+                    checkpoint_path = str(checkpoint_files[0])
+                    try:
+                        model.load_state_dict(torch.load(checkpoint_path, map_location=device, weights_only=True))
+                        logger.info(f"模型权重加载成功: {checkpoint_path}")
+                    except Exception as e:
+                        logger.warning(f"无法加载预训练权重: {e}，使用随机初始化")
+                else:
+                    logger.info("未找到预训练权重，使用随机初始化")
+        
+        model.to(device)
+        model.eval()
+        logger.info("模型加载完成")
+        
+    except Exception as e:
+        logger.error(f"模型初始化失败: {e}")
+        # 创建一个简化的模型用于演示
         from model.model_config import get_backbones
-        all_backbones = get_backbones('configurations/PEMS04.conf', DATA_CONFIG['distance_path'], device)
+        try:
+            all_backbones = get_backbones('configurations/PEMS04.conf', DATA_CONFIG['distance_path'], device)
+        except:
+            # 如果配置加载失败，使用空的backbones
+            all_backbones = []
         
         model = UpgradeASTGCN(
-            num_of_features=3,  # 根据数据集特征数设定 (PEMS04数据集有3个特征)
+            num_of_features=3,
             num_for_prediction=MODEL_CONFIG['num_for_prediction'],
             all_backbones=all_backbones,
             num_of_vertices=MODEL_CONFIG['num_of_vertices'],
@@ -229,35 +495,6 @@ async def startup_event():
                 'max_len': 36,
                 'factor': 5
             }
-        )
-        
-        # 尝试加载预训练权重
-        param_dir = Path("params")
-        if param_dir.exists():
-            checkpoint_files = list(param_dir.rglob("*net_*.params"))
-            if checkpoint_files:
-                checkpoint_path = str(checkpoint_files[0])
-                try:
-                    model.load_state_dict(torch.load(checkpoint_path, map_location=device, weights_only=True))
-                    logger.info(f"模型权重加载成功: {checkpoint_path}")
-                except Exception as e:
-                    logger.warning(f"无法加载预训练权重: {e}，使用随机初始化")
-            else:
-                logger.info("未找到预训练权重，使用随机初始化")
-        
-        model.to(device)
-        model.eval()
-        logger.info("模型加载完成")
-        
-    except Exception as e:
-        logger.error(f"模型初始化失败: {e}")
-        # 创建一个简化的模型用于演示
-        model = UpgradeASTGCN(
-            num_of_vertices=MODEL_CONFIG['num_of_vertices'],
-            len_input=MODEL_CONFIG['len_input'],
-            num_for_prediction=MODEL_CONFIG['num_for_prediction'],
-            spatial_mode=0,  # 使用基础模式
-            temporal_mode=0
         )
         model.to(device)
         model.eval()
