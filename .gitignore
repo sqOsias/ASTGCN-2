@@ -31,3 +31,4 @@ data/PEMS08/pems08.npz
 
 
 realtime_server/frontend/node_modules/
+baselines/results/
