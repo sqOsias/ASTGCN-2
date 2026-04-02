@@ -56,6 +56,7 @@
             :networkData="networkData" 
             :topology="topology"
             :metrics="systemMetrics"
+            :historyBuffer="historyBuffer"
             @node-click="handleNodeClick"
           />
         </el-tab-pane>
@@ -87,6 +88,16 @@
             @node-pair-click="handleNodePairClick"
           />
         </el-tab-pane>
+        
+        <el-tab-pane label="模型对比" name="comparison" class="h-full">
+          <template #label>
+            <span class="flex items-center gap-2">
+              <el-icon><DataAnalysis /></el-icon>
+              <span>模型对比</span>
+            </span>
+          </template>
+          <ModelComparisonView />
+        </el-tab-pane>
       </el-tabs>
     </main>
   </div>
@@ -97,6 +108,7 @@ import { ref, reactive, onMounted, onUnmounted, watch } from 'vue'
 import TopologyView from './components/TopologyView.vue'
 import TimeSeriesView from './components/TimeSeriesView.vue'
 import AttentionView from './components/AttentionView.vue'
+import ModelComparisonView from './components/ModelComparisonView.vue'
 
 // State
 const activeTab = ref('topology')

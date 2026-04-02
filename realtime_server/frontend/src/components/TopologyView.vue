@@ -25,6 +25,30 @@
           </el-button-group>
         </div>
         
+        <!-- Center: Replay Controls -->
+        <div class="flex items-center gap-3 bg-slate-900/80 px-3 py-1.5 rounded-full border border-slate-700/50">
+          <el-button 
+            size="small" 
+            circle 
+            :type="isReplaying ? 'danger' : 'primary'"
+            @click="toggleReplay"
+          >
+            <el-icon><VideoPlay v-if="!isReplaying" /><VideoPause v-else /></el-icon>
+          </el-button>
+          <el-slider 
+            v-model="replayIndex" 
+            :min="0" 
+            :max="historyLength - 1"
+            :disabled="historyLength === 0"
+            :show-tooltip="false"
+            style="width: 120px"
+            size="small"
+          />
+          <span class="text-xs text-slate-400 font-mono w-16">
+            {{ replayTimeLabel }}
+          </span>
+        </div>
+        
         <!-- Right: Focus Mode Toggle -->
         <div class="flex items-center gap-3">
           <div class="text-xs text-slate-400">震中聚焦</div>
@@ -202,7 +226,8 @@ use([CanvasRenderer, GraphChart, EffectScatterChart, TooltipComponent, LegendCom
 const props = defineProps({
   networkData: { type: Array, default: () => [] },
   topology: { type: Object, default: () => ({ nodes: [], edges: [] }) },
-  metrics: { type: Object, default: () => ({ mae: 0, rmse: 0 }) }
+  metrics: { type: Object, default: () => ({ mae: 0, rmse: 0 }) },
+  historyBuffer: { type: Array, default: () => [] }
 })
 
 const emit = defineEmits(['node-click'])
@@ -211,6 +236,45 @@ const chartRef = shallowRef(null)
 const viewMode = ref('current')
 const epicenterMode = ref(false)
 const totalNodes = 307
+
+// Replay state
+const isReplaying = ref(false)
+const replayIndex = ref(0)
+let replayTimer = null
+
+const historyLength = computed(() => props.historyBuffer.length)
+
+const replayTimeLabel = computed(() => {
+  if (historyLength.value === 0) return '--:--'
+  const offset = replayIndex.value - (historyLength.value - 1)
+  return offset === 0 ? 'NOW' : `${offset * 5}m`
+})
+
+const toggleReplay = () => {
+  if (isReplaying.value) {
+    clearInterval(replayTimer)
+    isReplaying.value = false
+  } else {
+    isReplaying.value = true
+    replayIndex.value = 0
+    replayTimer = setInterval(() => {
+      if (replayIndex.value < historyLength.value - 1) {
+        replayIndex.value++
+      } else {
+        clearInterval(replayTimer)
+        isReplaying.value = false
+      }
+    }, 500)
+  }
+}
+
+// Current display data (live or replay)
+const displayData = computed(() => {
+  if (isReplaying.value || replayIndex.value < historyLength.value - 1) {
+    return props.historyBuffer[replayIndex.value]?.data || []
+  }
+  return props.networkData
+})
 
 // Color helpers
 const getSpeedColor = (speed) => {
@@ -225,11 +289,12 @@ const getSpeedTextColor = (speed) => {
   return 'text-red-400'
 }
 
-// Node speeds
+// Node speeds (uses displayData for replay support)
 const nodeSpeedMap = computed(() => {
   const map = {}
-  if (!props.networkData.length) return map
-  props.networkData.forEach(node => {
+  const data = displayData.value
+  if (!data.length) return map
+  data.forEach(node => {
     map[node.node_id] = viewMode.value === 'current' 
       ? node.current_real_speed 
       : (node.future_pred_speeds?.[5] || node.current_real_speed)
@@ -365,7 +430,7 @@ const chartOption = computed(() => {
     })
   }
   
-  // Build edges - only show congested edges
+  // Build edges - color based on congestion level
   const edges = []
   props.topology.edges.forEach(edge => {
     const sourceSpeed = nodeSpeedMap.value[edge.source] || 60
@@ -377,21 +442,38 @@ const chartOption = computed(() => {
       if (!epicenterSet.has(edge.source) || !epicenterSet.has(edge.target)) return
     }
     
-    // Only show congested edges (speed < 30) as red rays
-    if (avgSpeed < 30) {
-      edges.push({
-        source: String(edge.source),
-        target: String(edge.target),
-        lineStyle: {
-          color: avgSpeed < 20 
-            ? 'rgba(239,68,68,0.9)' 
-            : 'rgba(251,191,36,0.5)',
-          width: avgSpeed < 20 ? 2.5 : 1.5,
-          shadowColor: avgSpeed < 20 ? 'rgba(239,68,68,0.6)' : 'transparent',
-          shadowBlur: avgSpeed < 20 ? 8 : 0
-        }
-      })
+    // Determine edge style based on speed
+    let edgeColor, edgeWidth, shadowColor, shadowBlur
+    if (avgSpeed < 40) {
+      // Severe congestion - bright red with glow
+      edgeColor = 'rgba(239, 68, 68, 0.95)'
+      edgeWidth = 3
+      shadowColor = 'rgba(239, 68, 68, 0.8)'
+      shadowBlur = 12
+    } else if (avgSpeed < 80) {
+      // Slow traffic - yellow/amber
+      edgeColor = 'rgba(251, 191, 36, 0.8)'
+      edgeWidth = 2
+      shadowColor = 'rgba(251, 191, 36, 0.4)'
+      shadowBlur = 6
+    } else {
+      // Normal flow - subtle cyan (hidden by default, show on hover)
+      edgeColor = 'rgba(34, 211, 238, 0.15)'
+      edgeWidth = 0.5
+      shadowColor = 'transparent'
+      shadowBlur = 0
     }
+    
+    edges.push({
+      source: String(edge.source),
+      target: String(edge.target),
+      lineStyle: {
+        color: edgeColor,
+        width: edgeWidth,
+        shadowColor: shadowColor,
+        shadowBlur: shadowBlur
+      }
+    })
   })
   
   return {

@@ -321,9 +321,11 @@ def load_data():
     print(f"Loading data from: {CONFIG['data_path']}")
     data = np.load(CONFIG['data_path'])
     # Data shape: (num_samples, num_vertices, num_features)
-    # Keep all features for model input, but track speed (feature 0) for display
+    # PEMS04 features: [0]=flow, [1]=occupy, [2]=speed
+    # Keep all features for model input, but track speed (feature 2) for display
     state.all_data = data['data']  # Shape: (T, N, F) - all features
-    state.speed_data = data['data'][:, :, 0]  # Speed feature for display
+    # Speed is in mph, convert to km/h for display (1 mph = 1.609 km/h)
+    state.speed_data = data['data'][:, :, 2] * 1.609  # Speed feature (index 2), converted to km/h
     
     # Calculate statistics for normalization (per feature)
     state.mean = np.mean(state.all_data, axis=(0, 1))  # Shape: (F,)
@@ -392,8 +394,8 @@ def run_inference():
     
     # Fallback: persistence with trend based on recent history
     window_data = np.array(list(state.sliding_window))
-    current_speed = window_data[-1, :, 0]  # Last timestep, all nodes, speed feature
-    trend = (window_data[-1, :, 0] - window_data[-6, :, 0]) / 5  # 5-step trend
+    current_speed = window_data[-1, :, 2]  # Last timestep, all nodes, speed feature (index 2)
+    trend = (window_data[-1, :, 2] - window_data[-6, :, 2]) / 5  # 5-step trend
     
     predictions = np.zeros((num_nodes, num_pred_steps))
     for i in range(num_pred_steps):

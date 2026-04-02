@@ -49,19 +49,36 @@
         />
       </div>
       
-      <!-- Residual Chart -->
-      <div class="h-28 cyber-panel mt-2 flex-shrink-0">
-        <div class="cyber-panel-header py-1 text-xs">
-          <el-icon><Histogram /></el-icon>
-          预测误差 (真实 - 预测)
+      <!-- Bottom Charts Row -->
+      <div class="h-32 flex gap-2 mt-2 flex-shrink-0">
+        <!-- Residual Chart -->
+        <div class="flex-1 cyber-panel">
+          <div class="cyber-panel-header py-1 text-xs">
+            <el-icon><Histogram /></el-icon>
+            预测误差
+          </div>
+          <v-chart 
+            ref="residualChartRef"
+            class="w-full"
+            style="height: calc(100% - 24px);"
+            :option="residualChartOption" 
+            :autoresize="true"
+          />
         </div>
-        <v-chart 
-          ref="residualChartRef"
-          class="w-full"
-          style="height: calc(100% - 28px);"
-          :option="residualChartOption" 
-          :autoresize="true"
-        />
+        
+        <!-- Multi-step Prediction Comparison -->
+        <div class="flex-1 cyber-panel">
+          <div class="cyber-panel-header py-1 text-xs">
+            <el-icon><Aim /></el-icon>
+            多步预测对比
+          </div>
+          <v-chart 
+            class="w-full"
+            style="height: calc(100% - 24px);"
+            :option="multiStepChartOption" 
+            :autoresize="true"
+          />
+        </div>
       </div>
     </div>
     
@@ -149,7 +166,7 @@ import {
   LegendComponent
 } from 'echarts/components'
 import VChart from 'vue-echarts'
-import { TrendCharts, Histogram, InfoFilled, Timer, DataLine } from '@element-plus/icons-vue'
+import { TrendCharts, Histogram, InfoFilled, Timer, DataLine, Aim } from '@element-plus/icons-vue'
 
 use([
   CanvasRenderer, 
@@ -285,10 +302,11 @@ const mainChartOption = computed(() => {
   return {
     backgroundColor: 'transparent',
     grid: {
-      left: 50,
+      left: 60,
       right: 20,
-      top: 20,
-      bottom: 30
+      top: 25,
+      bottom: 35,
+      containLabel: true
     },
     tooltip: {
       trigger: 'axis',
@@ -375,10 +393,11 @@ const residualChartOption = computed(() => {
   return {
     backgroundColor: 'transparent',
     grid: {
-      left: 45,
+      left: 55,
       right: 15,
-      top: 10,
-      bottom: 15
+      top: 15,
+      bottom: 20,
+      containLabel: true
     },
     xAxis: {
       type: 'category',
@@ -404,6 +423,77 @@ const residualChartOption = computed(() => {
         data: [
           { yAxis: 0, lineStyle: { color: '#475569', width: 1 } }
         ]
+      }
+    }]
+  }
+})
+
+// Multi-step prediction comparison chart
+const multiStepChartOption = computed(() => {
+  const predictions = futurePredictions.value
+  const steps = ['5m', '15m', '30m', '45m', '60m']
+  const indices = [0, 2, 5, 8, 11] // Corresponding indices in future_pred_speeds array
+  
+  const data = indices.map((idx, i) => ({
+    name: steps[i],
+    value: predictions[idx] || 0
+  }))
+  
+  return {
+    backgroundColor: 'transparent',
+    grid: {
+      left: 40,
+      right: 15,
+      top: 10,
+      bottom: 20,
+      containLabel: true
+    },
+    tooltip: {
+      trigger: 'axis',
+      backgroundColor: 'rgba(15, 23, 42, 0.95)',
+      borderColor: 'rgba(0, 212, 255, 0.3)',
+      textStyle: { color: '#e2e8f0', fontSize: 11 },
+      formatter: (params) => `${params[0].name}: <b>${params[0].value?.toFixed(1)}</b> km/h`
+    },
+    xAxis: {
+      type: 'category',
+      data: steps,
+      axisLine: { lineStyle: { color: '#334155' } },
+      axisLabel: { color: '#64748b', fontSize: 9 }
+    },
+    yAxis: {
+      type: 'value',
+      axisLine: { show: false },
+      axisLabel: { color: '#64748b', fontSize: 9 },
+      splitLine: { lineStyle: { color: '#1e293b' } },
+      min: 0,
+      max: 140
+    },
+    series: [{
+      type: 'line',
+      data: data.map(d => d.value),
+      smooth: true,
+      symbol: 'circle',
+      symbolSize: 6,
+      lineStyle: { color: '#f97316', width: 2 },
+      itemStyle: { color: '#f97316', borderColor: '#0a0e1a', borderWidth: 1 },
+      areaStyle: {
+        color: {
+          type: 'linear',
+          x: 0, y: 0, x2: 0, y2: 1,
+          colorStops: [
+            { offset: 0, color: 'rgba(249, 115, 22, 0.3)' },
+            { offset: 1, color: 'rgba(249, 115, 22, 0)' }
+          ]
+        }
+      },
+      markLine: {
+        silent: true,
+        symbol: 'none',
+        data: [
+          { yAxis: currentSpeed.value, lineStyle: { color: '#22d3ee', width: 1, type: 'dashed' } }
+        ],
+        label: { show: false }
       }
     }]
   }
