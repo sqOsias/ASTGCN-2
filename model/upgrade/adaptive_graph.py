@@ -9,7 +9,8 @@ class AdaptiveGraph(nn.Module):
         self.sparse_ratio = float(sparse_ratio)
         self.directed = bool(directed)
         
-        # 修复：摒弃 randn 避免产生极端的 logits 造成 Softmax 梯度消失
+        # 每个路口（num_nodes=307）都有一个长度为 embedding_dim（通常为10）的向量
+        
         self.node_emb_src = nn.Parameter(torch.empty(num_nodes, embedding_dim))
         self.node_emb_dst = nn.Parameter(torch.empty(num_nodes, embedding_dim))
         nn.init.xavier_uniform_(self.node_emb_src)

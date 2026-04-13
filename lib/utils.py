@@ -56,6 +56,7 @@ def search_data(sequence_length, num_of_batches, label_start_idx,
 def get_sample_indices(data_sequence, num_of_weeks, num_of_days, num_of_hours,
                        label_start_idx, num_for_predict, points_per_hour=12, only_check=False):
     '''
+    给定一个预测起点 label_start_idx，从原始时间序列里切出 3 组历史输入（周、日、近邻小时）和 1 组未来目标。
     Parameters
     ----------
     data_sequence: np.ndarray
@@ -171,7 +172,7 @@ def scaled_Laplacian(W):
 
     L = D - W
 
-    lambda_max = eigs(L, k=1, which='LR')[0].real
+    lambda_max = eigs(L, k=1, which='LR')[0].real # eigs：求特征值
 
     return (2 * L) / lambda_max - np.identity(W.shape[0])
 
@@ -197,8 +198,8 @@ def cheb_polynomial(L_tilde, K):
     cheb_polynomials = [np.identity(N), L_tilde.copy()]
 
     for i in range(2, K):
-        cheb_polynomials.append(
-            2 * L_tilde * cheb_polynomials[i - 1] - cheb_polynomials[i - 2])
+        next_polynomial = 2 * (L_tilde @ cheb_polynomials[i - 1]) - cheb_polynomials[i - 2]
+        cheb_polynomials.append(next_polynomial)
 
     return cheb_polynomials
 

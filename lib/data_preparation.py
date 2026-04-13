@@ -117,6 +117,8 @@ def read_and_generate_dataset(graph_signal_matrix_filename,
             valid_indices.append(idx)
     
     print(f'Total valid samples: {len(valid_indices)}')
+    # todo 打印前10个valid_indices
+    print(f'[INFO]First 10 valid indices: {valid_indices[:10]}')  
     
     # 计算分割点
     split_line1 = int(len(valid_indices) * 0.6)
@@ -138,6 +140,14 @@ def read_and_generate_dataset(graph_signal_matrix_filename,
                     np.expand_dims(target, axis=0).transpose((0, 2, 3, 1))[:, :, 2, :]
                 ))
         if batch_samples:
+            """
+            在每个元组内沿 batch 维度（axis=0）拼接，把多个 (1, N, F, H) 拼成 (B, N, F, H)。
+            最终返回 4 个数组，形状分别为：
+            week: (B, N, F, num_of_weeks*points_per_hour)
+            day: (B, N, F, num_of_days*points_per_hour)
+            hour: (B, N, F, num_of_hours*points_per_hour)
+            target: (B, N, num_for_predict)
+            """
             return [np.concatenate(i, axis=0) for i in zip(*batch_samples)]
         else:
             return [np.array([]) for _ in range(4)]  # 返回空数组列表

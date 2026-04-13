@@ -20,6 +20,7 @@ class AdaptiveDiffusionConv(nn.Module):
         nn.init.xavier_uniform_(self.Theta)
 
     def forward(self, x, spatial_attention):
+        # print("AdaptiveDiffusionConv输入数据 x 的形状是：", x.shape)
         batch_size, num_of_vertices, num_of_features, num_of_timesteps = x.shape
         
         adj = self.adaptive_graph()
@@ -65,7 +66,9 @@ class UpgradeASTGCNBlock(nn.Module):
         self.spatial_mode = spatial_mode
         self.temporal_mode = temporal_mode
 
+        # 空间注意力机制计算器
         self.SAt = Spatial_Attention_layer()
+
         if spatial_mode == 0:
             from model.astgcn import cheb_conv_with_SAt
             self.spatial_conv = cheb_conv_with_SAt(
@@ -119,13 +122,22 @@ class UpgradeASTGCNBlock(nn.Module):
         self.ln = nn.LayerNorm(num_of_time_filters)
 
     def forward(self, x):
+        # print("STAttBlock输入数据 x 的形状是：", x.shape)
+        # 计算 307 个节点此时此刻的相互注意力权重矩阵 spatial_at
         spatial_at = self.SAt(x)
+         # 把数据和权重送进图卷积。原本 5 维的特征被映射成 64 维的高级隐藏特征
         spatial_gcn = self.spatial_conv(x, spatial_at)
 
         if self.temporal_mode == 0:
             temporal_at = self.TAt(x)
             b, n, c, t = spatial_gcn.shape
             # [修复]：正确合并 Node 和 Channel 维度，保留 Time 维度在末尾进行矩阵乘法
+            # 左矩阵形状：[b, D, t] （D = n*c）
+            # 右矩阵形状：[t, t] （时间注意力权重矩阵）
+            # 相乘规则：
+                # 最后一维 × 倒数第二维
+                # D × t 矩阵 × t × t 矩阵 = D × t 矩阵
+                # 批次 b 保持不变
             spatial_gcn = torch.matmul(
                 spatial_gcn.reshape(b, -1, t),
                 temporal_at
@@ -138,20 +150,21 @@ class UpgradeASTGCNBlock(nn.Module):
                 time_features = x[:, :, -2:, :].permute(0, 1, 3, 2).reshape(b * n, t, 2)
             
             transformer_in = spatial_gcn.permute(0, 1, 3, 2).reshape(b * n, t, c)
+            # # 带着时间标签一起送进去算 ProbSparse Attention 和 蒸馏池化
             transformer_out = self.transformer(transformer_in, time_features=time_features)
             transformer_out = self.transformer_out(transformer_out)
             
-            t_new = transformer_out.shape[1]
-            time_conv_output = transformer_out.reshape(b, n, t_new, -1).permute(0, 1, 3, 2)
+            t_new = transformer_out.shape[1]  # 第二个维度t
+            time_conv_output = transformer_out.reshape(b, n, t_new, -1).permute(0, 1, 3, 2) # 还原回 (b, n, c, t) 形状
 
-        x_residual = self.residual_conv(x.permute(0, 2, 1, 3)).permute(0, 2, 1, 3)
+        x_residual = self.residual_conv(x.permute(0, 2, 1, 3)).permute(0, 2, 1, 3) # （b, n, c, t）
         
         # 确保 x_residual 和 time_conv_output 形状完全匹配
         # 兼容蒸馏操作改变的时间轴维度长度
         if self.temporal_mode != 0:
-            t_new = time_conv_output.shape[-1]
-            if x_residual.shape[-1] != t_new:
-                x_residual = F.interpolate(x_residual, size=t_new, mode='nearest')
+            t_new = time_conv_output.shape[-1] # 获取经过 Transformer 和时间卷积后新的时间维度长度
+            if x_residual.shape[-1] != t_new: # 如果残差的时间维度长度与卷积输出不匹配，进行调整
+                x_residual = F.interpolate(x_residual, size=t_new, mode='nearest') # 进行最近邻插值
         
         # 额外确保通道维度也匹配（防止任何可能的维度不匹配）
         if x_residual.shape[2] != time_conv_output.shape[2]:
@@ -195,7 +208,6 @@ class UpgradeASTGCNSubmodule(nn.Module):
             ))
             current_channels = backbone['num_of_time_filters']
 
-        # 修复致命错误 RuntimeError：抛弃了僵化的 Conv2d
         # 通过 LazyLinear 在 forward 时自动推断 (C * T_剩余) 的大小，映射到目标长序列预测(如 36)，从根源解决输入维度报错
         self.final_linear = nn.LazyLinear(num_for_prediction)
         
@@ -204,6 +216,7 @@ class UpgradeASTGCNSubmodule(nn.Module):
         nn.init.xavier_uniform_(self.W.unsqueeze(0))
 
     def forward(self, x):
+        # print("UpgradeASTGCNSubmodule输入数据 x 的形状是：", x.shape)
         for block in self.blocks:
             x = block(x)
             
@@ -238,5 +251,7 @@ class UpgradeASTGCN(nn.Module):
     def forward(self, x_list):
         submodule_outputs =[]
         for idx in range(len(x_list)):
+            # self.submodules: 调用UpgradeASTGCNSubmodule的forward方法，每个子模块处理对应的输入数据 x_list[idx]
+            # 并将输出结果添加到 submodule_outputs 列表中
             submodule_outputs.append(self.submodules[idx](x_list[idx]))
         return torch.stack(submodule_outputs, dim=0).sum(dim=0)

@@ -88,8 +88,9 @@ class cheb_conv_with_SAt(nn.Module):  # MXNet:nn.Block → PyTorch:nn.Module
         '''
         super(cheb_conv_with_SAt, self).__init__()
         self.K = K
-        self.num_of_filters = num_of_filters
-        self.cheb_polynomials = cheb_polynomials
+        self.num_of_filters = num_of_filters  # 输出的特征通道数
+        self.cheb_polynomials = cheb_polynomials # 预先计算好的切比雪夫多项式列表，长度为 K ,这些矩阵定义了图的拓扑结构（如邻接关系）
+        # 图卷积层的可学习权重矩阵
         self.Theta = None  # MXNet:self.params.get(...allow_deferred_init=True) → PyTorch:lazy nn.Parameter
 
     def _lazy_theta(self, shape, x):
@@ -122,26 +123,39 @@ class cheb_conv_with_SAt(nn.Module):  # MXNet:nn.Block → PyTorch:nn.Module
 
         outputs = []
         for time_step in range(num_of_timesteps):
-            # shape is (batch_size, V, F)
+            # shape is (B N C T) → (B N C) 取出每个时间步的图信号
             graph_signal = x[:, :, :, time_step]
             output = torch.zeros((batch_size, num_of_vertices, self.num_of_filters), device=x.device, dtype=x.dtype)  # MXNet:nd.zeros(ctx=...) → PyTorch:torch.zeros(device=...)
             for k in range(self.K):
 
-                # shape of T_k is (V, V)
+                # shape of T_k is (N, N)
                 T_k = self.cheb_polynomials[k]
 
-                # shape of T_k_with_at is (batch_size, V, V)
+                # shape of T_k_with_at is (batch_size, N, N)
+                # T_k表示k阶切比雪夫多项式，定义了图中节点的静态 k 阶邻居关系
+                # spatial_attention表示空间注意力分数，反映了此时时刻节点间的实时关联。
+                # 用注意力分数（动态权重）对切比雪夫矩阵（静态邻居）进行了缩放
+                # 表示在物理上的 k 阶邻居中，哪些节点对当前路段的影响力在此时此刻是最大的
                 T_k_with_at = T_k * spatial_attention
 
-                # shape of theta_k is (F, num_of_filters)
-                theta_k = self.Theta[k]  # MXNet:param.data()[k] → PyTorch:Parameter slicing
+                # shape of theta_k is (N, num_of_filters)
+                # # theta_k 是第 k 阶卷积核的可学习权重参数矩阵（形状 [F, num_filters]）。
+                # 它负责将聚合后的原始特征映射到更高维的特征空间。      
+                theta_k = self.Theta[k]  
 
-                # shape is (batch_size, V, F)
-                rhs = torch.bmm(T_k_with_at.permute(0, 2, 1), graph_signal)  # MXNet:nd.batch_dot+transpose → PyTorch:bmm+permute
+                # shape is (batch_size, N, F)
+                # T_k_with_at表示动态权重矩阵
+                # graph_signal 表示输入的图信号矩阵，形状为 (batch_size, N, F)
+                # 对于每个路口，根据动态邻居权重，把周围路口在此时刻的交通特征（如车速、流量）吸收到自己身上
+                rhs = torch.bmm(T_k_with_at.permute(0, 2, 1), graph_signal) 
 
-                output = output + torch.matmul(rhs, theta_k)  # MXNet:nd.dot → PyTorch:torch.matmul
-            outputs.append(output.unsqueeze(-1))  # MXNet:expand_dims → PyTorch:unsqueeze
-        return F.relu(torch.cat(outputs, dim=-1))  # MXNet:nd.concat/nd.relu → PyTorch:torch.cat/F.relu
+                # 将吸收了空间信息的聚合特征 [B, N, F] 通过权重矩阵进行线性变换，映射到输出通道数
+                # 输入：（B, N, F）× （F, num_filters）
+                # 输出：（B, N, num_filters）
+                output = output + torch.matmul(rhs, theta_k)  
+
+            outputs.append(output.unsqueeze(-1))  #
+        return F.relu(torch.cat(outputs, dim=-1))  # 
 
 
 class Temporal_Attention_layer(nn.Module):  # MXNet:nn.Block → PyTorch:nn.Module
