@@ -5,53 +5,7 @@ import torch.nn.functional as F
 from model.astgcn import Spatial_Attention_layer, Temporal_Attention_layer
 from model.upgrade.adaptive_graph import AdaptiveGraph
 from model.upgrade.temporal_transformer import TemporalTransformer
-
-class AdaptiveDiffusionConv(nn.Module):
-    # 修复更名：自适应矩阵不严格正交，摒弃切比雪夫采用随机游走扩散卷积更数学严谨
-    def __init__(self, in_channels, num_of_filters, K, num_of_vertices, adaptive_graph):
-        super(AdaptiveDiffusionConv, self).__init__()
-        self.K = K
-        self.num_of_filters = num_of_filters
-        self.num_of_vertices = num_of_vertices
-        self.adaptive_graph = adaptive_graph
-        
-        # 修复致命错误：移除了 Lazy 的初始化，严格在 init 中注册 nn.Parameter
-        self.Theta = nn.Parameter(torch.empty(self.K, in_channels, self.num_of_filters))
-        nn.init.xavier_uniform_(self.Theta)
-
-    def forward(self, x, spatial_attention):
-        # print("AdaptiveDiffusionConv输入数据 x 的形状是：", x.shape)
-        batch_size, num_of_vertices, num_of_features, num_of_timesteps = x.shape
-        
-        adj = self.adaptive_graph()
-        if spatial_attention is not None:
-            # 确保 spatial_attention 与 adj 形状兼容
-            if spatial_attention.dim() == 3:
-                # 如果 spatial_attention 已经是 (batch_size, num_of_vertices, num_of_vertices)
-                adj = adj.unsqueeze(0) * spatial_attention
-            else:
-                # 如果 spatial_attention 是 (num_of_vertices, num_of_vertices)，则扩展到批次
-                adj = adj.unsqueeze(0) * spatial_attention.unsqueeze(0).expand(batch_size, -1, -1)
-        else:
-            adj = adj.unsqueeze(0).expand(batch_size, -1, -1)
-
-        # 修复：确保 eye 矩阵也扩展到相同批次大小
-        eye = torch.eye(num_of_vertices, device=x.device, dtype=x.dtype).unsqueeze(0).expand(batch_size, -1, -1)
-        supports = [eye, adj]
-        for _ in range(2, self.K):
-            supports.append(torch.matmul(supports[-1], adj))
-
-        outputs =[]
-        for time_step in range(num_of_timesteps):
-            graph_signal = x[:, :, :, time_step]
-            output = torch.zeros((batch_size, num_of_vertices, self.num_of_filters), device=x.device, dtype=x.dtype)
-            for k in range(self.K):
-                theta_k = self.Theta[k]
-                rhs = torch.bmm(supports[k].permute(0, 2, 1), graph_signal)
-                output = output + torch.matmul(rhs, theta_k)
-            outputs.append(output.unsqueeze(-1))
-            
-        return F.relu(torch.cat(outputs, dim=-1))
+from model.upgrade.adaptive_diffusion_conv import AdaptiveDiffusionConv
 
 
 class UpgradeASTGCNBlock(nn.Module):

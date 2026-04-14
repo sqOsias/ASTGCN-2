@@ -3,6 +3,9 @@ from torch import nn
 import torch.nn.functional as F
 
 class AdaptiveGraph(nn.Module):
+    """
+    自适应学习路网结构，输出一个动态调整的邻接矩阵。
+    """
     def __init__(self, num_nodes, embedding_dim, sparse_ratio=0.0, directed=True):
         super(AdaptiveGraph, self).__init__()
         self.num_nodes = num_nodes
