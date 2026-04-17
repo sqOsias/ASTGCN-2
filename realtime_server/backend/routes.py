@@ -12,6 +12,7 @@ from fastapi import WebSocket, WebSocketDisconnect, HTTPException
 from config import CONFIG
 from state import state
 from simulation import simulation_loop
+from route_planner import plan_routes
 
 
 def register_routes(app):
@@ -197,6 +198,54 @@ def register_routes(app):
             state.is_running = True
             state.simulation_task = asyncio.create_task(simulation_loop())
         return {"status": "running"}
+
+    # ============== Route Planning ==============
+    @app.get("/api/route/plan")
+    async def route_plan(source: int, target: int, k: int = 3):
+        """Plan K time-dependent routes from source to target.
+
+        Uses ASTGCN predicted future speeds to compute ETAs that
+        account for upcoming congestion, not just current conditions.
+        """
+        result = plan_routes(source, target, k)
+        if 'error' in result and 'routes' not in result:
+            raise HTTPException(status_code=400, detail=result['error'])
+        return result
+
+    @app.get("/api/route/components")
+    async def route_components():
+        """Return connected component info so frontend can validate
+        source/target selection before calling plan."""
+        from route_planner import build_adjacency
+        from collections import deque
+
+        adj = build_adjacency()
+        visited = set()
+        components = []
+        for n in range(CONFIG['num_of_vertices']):
+            if n in visited:
+                continue
+            comp = []
+            queue = deque([n])
+            while queue:
+                node = queue.popleft()
+                if node in visited:
+                    continue
+                visited.add(node)
+                comp.append(node)
+                for nbr, _ in adj.get(node, []):
+                    if nbr not in visited:
+                        queue.append(nbr)
+            components.append(comp)
+
+        components.sort(key=len, reverse=True)
+        return {
+            'num_components': len(components),
+            'components': [
+                {'id': i, 'size': len(c), 'nodes': c}
+                for i, c in enumerate(components)
+            ]
+        }
 
     # ============== WebSocket ==============
     @app.websocket("/ws")

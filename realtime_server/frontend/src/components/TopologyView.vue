@@ -392,7 +392,7 @@ const generateGridPositions = () => {
   return positions
 }
 
-const gridPositions = generateGridPositions()
+const nodePositions = { value: generateGridPositions() }
 
 // ECharts option
 const chartOption = computed(() => {
@@ -404,7 +404,7 @@ const chartOption = computed(() => {
   const nodes = []
   for (let i = 0; i < totalNodes; i++) {
     const speed = nodeSpeedMap.value[i] || 60
-    const pos = gridPositions[i] || { x: 400, y: 300 }
+    const pos = nodePositions.value[i] || { x: 400, y: 300 }
     const isCongested = speed < 20
     const isTop5 = top5Ids.includes(i)
     const inEpicenter = epicenterSet.has(i)
@@ -505,7 +505,7 @@ const chartOption = computed(() => {
       links: edges,
       roam: true,
       zoom: isEpicenter ? 1.8 : 1.1,
-      center: isEpicenter && top5Ids.length > 0 ? [gridPositions[top5Ids[0]]?.x || 400, gridPositions[top5Ids[0]]?.y || 300] : undefined,
+      center: isEpicenter && top5Ids.length > 0 ? [nodePositions.value[top5Ids[0]]?.x || 400, nodePositions.value[top5Ids[0]]?.y || 300] : undefined,
       emphasis: {
         focus: 'adjacency',
         lineStyle: { width: 4 },

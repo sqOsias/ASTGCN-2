@@ -98,6 +98,20 @@
           </template>
           <ModelComparisonView />
         </el-tab-pane>
+        
+        <el-tab-pane label="智能路径规划" name="routeplan" class="h-full">
+          <template #label>
+            <span class="flex items-center gap-2">
+              <el-icon><Position /></el-icon>
+              <span>智能路径规划</span>
+            </span>
+          </template>
+          <RoutePlanView 
+            :networkData="networkData" 
+            :topology="topology"
+            :metrics="systemMetrics"
+          />
+        </el-tab-pane>
       </el-tabs>
     </main>
   </div>
@@ -109,6 +123,7 @@ import TopologyView from './components/TopologyView.vue'
 import TimeSeriesView from './components/TimeSeriesView.vue'
 import AttentionView from './components/AttentionView.vue'
 import ModelComparisonView from './components/ModelComparisonView.vue'
+import RoutePlanView from './components/RoutePlanView.vue'
 
 // State
 const activeTab = ref('topology')

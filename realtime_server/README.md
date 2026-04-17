@@ -83,16 +83,17 @@ cd /root/ASTGCN-2/realtime_server
 ## 4. 后端代码结构
 
 ```
-realtime_server/backend/          共 884 行
-├── main.py           (48行)    入口：创建 FastAPI app，注册 CORS 和路由
-├── config.py         (24行)    CONFIG 字典：路径、模型参数、仿真参数
-├── state.py          (70行)    SystemState 全局单例 + Pydantic 数据模型
-├── model_loader.py  (113行)    ASTGCN 模型构建、LazyConv warmup、权重加载
-├── data_loader.py   (210行)    PEMS04 数据加载、时间特征、边列表、节点布局、注意力矩阵
-├── inference.py      (98行)    模型推理（含 fallback）、MAE/RMSE 指标计算
-├── simulation.py     (89行)    仿真主循环（每秒一帧）、WebSocket 广播
-├── routes.py        (232行)    REST API + WebSocket 端点 + 生命周期事件
-└── requirements.txt            Python 依赖
+realtime_server/backend/
+├── main.py            入口：创建 FastAPI app，注册 CORS 和路由
+├── config.py          CONFIG 字典：路径、模型参数、仿真参数
+├── state.py           SystemState 全局单例 + Pydantic 数据模型
+├── model_loader.py    ASTGCN 模型构建、LazyConv warmup、权重加载
+├── data_loader.py     PEMS04 数据加载、时间特征、边列表、节点布局、注意力矩阵
+├── inference.py       模型推理（含 fallback）、MAE/RMSE 指标计算
+├── simulation.py      仿真主循环（每秒一帧）、WebSocket 广播
+├── route_planner.py   时间依赖型动态路径规划引擎（Dijkstra + K路线）
+├── routes.py          REST API + WebSocket 端点 + 生命周期事件
+└── requirements.txt   Python 依赖
 ```
 
 ### 模块依赖关系
@@ -113,6 +114,9 @@ main.py
         │     │     └── state.py
         │     ├── config.py
         │     └── state.py
+        ├── route_planner.py  (API 调用 plan_routes)
+        │     ├── config.py
+        │     └── state.py
         └── state.py
 ```
 
@@ -130,6 +134,17 @@ pems04.npz ──load_data()──▶ state.all_data (16992×307×5，含2个时
                             ├── ASTGCN 模型前向传播
                             └── 输出 307×12 预测速度 (km/h)
                        ──▶ WebSocket broadcast ──▶ 前端
+
+路径规划请求流:
+  GET /api/route/plan?source=X&target=Y
+    ├── build_adjacency()     从 edge_list 构建双向邻接表
+    ├── 获取最新预测速度       state.prediction_history[-1]
+    ├── time-dependent Dijkstra  虚拟时钟 + 节点速度查询
+    │     ├── 路段速度 = avg(起点预测速度, 终点预测速度)
+    │     ├── 时间越界 → 降级为最后一步预测
+    │     └── 最小速度兜底 5 km/h
+    ├── K路线搜索 (边惩罚法)
+    └── 返回路径、ETA、里程、速度剖面
 ```
 
 ---
@@ -137,15 +152,16 @@ pems04.npz ──load_data()──▶ state.all_data (16992×307×5，含2个时
 ## 5. 前端代码结构
 
 ```
-realtime_server/frontend/src/      共 2199 行
-├── main.js            (31行)    Vue 入口：注册 Element Plus、全局图标
-├── App.vue           (260行)    根组件：Tab 导航、WebSocket 连接、数据分发
-├── style.css         (156行)    全局样式：Tailwind + cyber 主题
+realtime_server/frontend/src/
+├── main.js              Vue 入口：注册 Element Plus、全局图标
+├── App.vue              根组件：Tab 导航、WebSocket 连接、数据分发
+├── style.css            全局样式：Tailwind + cyber 主题
 └── components/
-    ├── TopologyView.vue      (571行)  Tab1: 路网拓扑图 (ECharts Graph)
-    ├── TimeSeriesView.vue    (501行)  Tab2: 时序折线图 + 误差分析
-    ├── AttentionView.vue     (479行)  Tab3: 注意力热力图 + 节点关联
-    └── ModelComparisonView.vue(357行) Tab4: 模型性能对比
+    ├── TopologyView.vue       Tab1: 路网拓扑图 (ECharts Graph)
+    ├── TimeSeriesView.vue     Tab2: 时序折线图 + 误差分析
+    ├── AttentionView.vue      Tab3: 注意力热力图 + 节点关联
+    ├── ModelComparisonView.vue Tab4: 模型性能对比
+    └── RoutePlanView.vue      Tab5: 智能路径规划（动态前瞻性寻路）
 ```
 
 ### 组件数据流
@@ -193,6 +209,16 @@ App.vue
 - ASTGCN vs STGCN / GRU / LSTM / HA 指标对比
 - 多步预测衰减曲线
 
+### Tab 5: 智能路径规划
+- **时间依赖型寻路**：利用 ASTGCN 未来 1 小时预测速度，而非仅当前速度
+- **虚拟时钟机制**：车辆行至每个节点时，查询对应未来时刻的预测速度
+- **多路线推荐**：Top-K 条差异化路线（边惩罚法确保路径多样性）
+- **动态 vs 静态对比**：同时展示仅用当前速度的 ETA，量化预测带来的收益
+- **流光动画**：路线按顺序以彗星拖尾特效在地图上流光展示
+- **速度剖面图**：每条路线附带途中各节点预计车速曲线
+- **地图选点**：支持下拉选择 + 直接点击地图选取起终点
+- **连通分量感知**：自动按网络分量分组，避免跨分量无效寻路
+
 ---
 
 ## 7. API 接口
@@ -214,6 +240,8 @@ App.vue
 | `/api/simulation/speed` | POST | 设置仿真速度 (0.1-10x) |
 | `/api/simulation/pause` | POST | 暂停仿真 |
 | `/api/simulation/resume` | POST | 恢复仿真 |
+| `/api/route/plan?source=X&target=Y&k=3` | GET | 时间依赖型多路线规划 |
+| `/api/route/components` | GET | 网络连通分量信息 |
 
 ---
 
