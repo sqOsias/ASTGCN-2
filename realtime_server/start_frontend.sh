@@ -1,15 +1,23 @@
 #!/bin/bash
 # Start the Vue3 frontend development server
+# Usage: ./start_frontend.sh [port]
+# Default port: 3000
 
-cd "$(dirname "$0")/frontend"
+PORT=${1:-3000}
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+cd "$SCRIPT_DIR/frontend"
 
-# Check if node_modules exists
+# Install dependencies if needed
 if [ ! -d "node_modules" ]; then
     echo "Installing npm dependencies..."
     npm install
 fi
 
-# Start the dev server
-echo "Starting Vue3 frontend on http://localhost:3000"
+echo "=========================================="
+echo "  Starting Frontend on port ${PORT}"
+echo "=========================================="
+echo "  Dashboard:  http://localhost:${PORT}"
+echo "=========================================="
 echo ""
-npm run dev -- --host 0.0.0.0
+
+npm run dev -- --host 0.0.0.0 --port ${PORT}

@@ -137,7 +137,8 @@ let ws = null
 let reconnectTimer = null
 
 const connectWebSocket = () => {
-  const wsUrl = `ws://${window.location.hostname}:8000/ws`
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+  const wsUrl = `${protocol}//${window.location.host}/ws`
   console.log('Connecting to WebSocket:', wsUrl)
   
   ws = new WebSocket(wsUrl)

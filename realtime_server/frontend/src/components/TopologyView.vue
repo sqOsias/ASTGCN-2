@@ -38,7 +38,7 @@
           <el-slider 
             v-model="replayIndex" 
             :min="0" 
-            :max="historyLength - 1"
+            :max="Math.max(0, historyLength - 1)"
             :disabled="historyLength === 0"
             :show-tooltip="false"
             style="width: 120px"

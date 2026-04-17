@@ -1,24 +1,31 @@
 #!/bin/bash
 # Start the FastAPI backend server
+# Usage: ./start_backend.sh [port]
+# Default port: 8000
 
-cd "$(dirname "$0")/backend"
+PORT=${1:-8000}
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+cd "$SCRIPT_DIR/backend"
 
-# Check if virtual environment exists
-if [ ! -d "venv" ]; then
-    echo "Creating virtual environment..."
-    python3 -m venv venv
+# Kill existing process on target port
+existing=$(ss -tlnp 2>/dev/null | grep ":${PORT} " | grep -oP 'pid=\K[0-9]+' | head -1)
+if [ -n "$existing" ]; then
+    echo "Killing existing process on port ${PORT} (PID: $existing)..."
+    kill -9 "$existing" 2>/dev/null
+    sleep 1
 fi
 
-# Activate virtual environment
-source venv/bin/activate
+# Install dependencies (skip if already satisfied)
+echo "Checking dependencies..."
+pip install -r requirements.txt networkx -q 2>/dev/null
 
-# Install dependencies
-echo "Installing dependencies..."
-pip install -r requirements.txt -q
-
-# Start the server
-echo "Starting FastAPI server on http://localhost:8000"
-echo "WebSocket endpoint: ws://localhost:8000/ws"
-echo "API docs: http://localhost:8000/docs"
+echo "=========================================="
+echo "  Starting Backend on port ${PORT}"
+echo "=========================================="
+echo "  REST API:   http://localhost:${PORT}/api"
+echo "  WebSocket:  ws://localhost:${PORT}/ws"
+echo "  API Docs:   http://localhost:${PORT}/docs"
+echo "=========================================="
 echo ""
-python -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
+python3 -m uvicorn main:app --host 0.0.0.0 --port ${PORT}

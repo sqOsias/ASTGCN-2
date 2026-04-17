@@ -234,8 +234,8 @@ def run_training(cfg: ExperimentConfig, params_path: str,
     for epoch in range(1, train_cfg.epochs + 1):
         net.train()
         for train_w, train_d, train_r, train_t in train_loader:
-            print("近期输入数据 train_r 的形状是：", train_r.shape)
-            print("真实标签 train_t 的形状是：", train_t.shape)
+            # print("近期输入数据 train_r 的形状是：", train_r.shape)
+            # print("真实标签 train_t 的形状是：", train_t.shape)
             start_time = time()
             train_w = train_w.to(ctx)
             train_d = train_d.to(ctx)
