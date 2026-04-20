@@ -89,7 +89,7 @@
           />
         </el-tab-pane>
         
-        <el-tab-pane label="模型对比" name="comparison" class="h-full">
+        <!-- <el-tab-pane label="模型对比" name="comparison" class="h-full">
           <template #label>
             <span class="flex items-center gap-2">
               <el-icon><DataAnalysis /></el-icon>
@@ -97,7 +97,7 @@
             </span>
           </template>
           <ModelComparisonView />
-        </el-tab-pane>
+        </el-tab-pane> -->
         
         <el-tab-pane label="智能路径规划" name="routeplan" class="h-full">
           <template #label>

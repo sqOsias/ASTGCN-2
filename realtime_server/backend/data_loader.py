@@ -33,9 +33,9 @@ def load_edge_list():
 
 
 def compute_node_positions():
-    """Compute node positions using metro-map style layout for highway corridors"""
+    """Compute node positions using force-directed spring layout"""
     num_nodes = CONFIG['num_of_vertices']
-    print("Computing metro-map style layout...")
+    print("Computing force-directed layout...")
     
     # Build graph
     G = nx.Graph()
@@ -47,101 +47,46 @@ def compute_node_positions():
     components = list(nx.connected_components(G))
     print(f"Found {len(components)} connected components")
     
-    # For each component, find the longest path (main corridor)
-    def find_longest_path(subgraph):
-        """Find longest path in subgraph using BFS from endpoints"""
-        nodes = list(subgraph.nodes())
-        if len(nodes) <= 1:
-            return nodes
-        
-        # Find leaf nodes (degree 1) as potential endpoints
-        leaves = [n for n in nodes if subgraph.degree(n) == 1]
-        if not leaves:
-            leaves = nodes[:2]
-        
-        # BFS to find farthest node from first leaf
-        start = leaves[0]
-        distances = nx.single_source_shortest_path_length(subgraph, start)
-        end = max(distances.keys(), key=lambda x: distances[x])
-        
-        # Get shortest path as main corridor
-        try:
-            path = nx.shortest_path(subgraph, start, end)
-            return path
-        except:
-            return nodes
+    # Canvas dimensions
+    canvas_width, canvas_height = 750, 620
+    margin = 50
     
-    # Layout parameters
-    canvas_width, canvas_height = 750, 650
-    margin = 40
+    # Compute spring layout with good parameters
+    # k controls optimal distance between nodes, higher = more spread
+    # iterations ensures convergence
+    pos = nx.spring_layout(
+        G, 
+        k=2.5,           # Optimal distance between nodes
+        iterations=150,  # More iterations for better convergence
+        seed=42,         # Fixed seed for reproducible layout
+        scale=1.0
+    )
     
+    # Get bounds of computed positions
+    xs = [p[0] for p in pos.values()]
+    ys = [p[1] for p in pos.values()]
+    min_x, max_x = min(xs), max(xs)
+    min_y, max_y = min(ys), max(ys)
+    
+    # Scale to canvas with margin
+    scale_x = (canvas_width - 2 * margin) / max(max_x - min_x, 0.001)
+    scale_y = (canvas_height - 2 * margin) / max(max_y - min_y, 0.001)
+    scale = min(scale_x, scale_y)  # Uniform scaling to preserve aspect ratio
+    
+    # Center offset
+    center_x = (canvas_width - (max_x - min_x) * scale) / 2
+    center_y = (canvas_height - (max_y - min_y) * scale) / 2
+    
+    # Convert to canvas coordinates
     positions = {}
-    y_offset = margin
-    corridor_height = 35  # Height between corridors
-    
-    # Sort components by size (largest first)
-    sorted_components = sorted(components, key=len, reverse=True)
-    
-    for comp_idx, component in enumerate(sorted_components):
-        subgraph = G.subgraph(component)
-        main_path = find_longest_path(subgraph)
-        
-        if len(main_path) == 0:
-            continue
-        
-        # Calculate x positions along the corridor
-        path_len = len(main_path)
-        x_step = (canvas_width - 2 * margin) / max(path_len - 1, 1)
-        
-        # Place main corridor nodes
-        placed = set()
-        for i, node in enumerate(main_path):
-            positions[node] = {
-                'x': margin + i * x_step,
-                'y': y_offset
-            }
-            placed.add(node)
-        
-        # Place branch nodes (nodes connected to main path but not on it)
-        branch_offset = 20
-        for node in component:
-            if node in placed:
-                continue
-            
-            # Find connected node on main path
-            neighbors = list(subgraph.neighbors(node))
-            parent = None
-            for n in neighbors:
-                if n in placed:
-                    parent = n
-                    break
-            
-            if parent is not None:
-                px, py = positions[parent]['x'], positions[parent]['y']
-                # Alternate above/below the main path
-                direction = 1 if (node % 2 == 0) else -1
-                positions[node] = {
-                    'x': px + np.random.uniform(-10, 10),
-                    'y': py + direction * branch_offset
-                }
-                placed.add(node)
-        
-        # Handle remaining unplaced nodes
-        for node in component:
-            if node not in placed:
-                positions[node] = {
-                    'x': margin + np.random.uniform(0, canvas_width - 2*margin),
-                    'y': y_offset + np.random.uniform(-15, 15)
-                }
-        
-        y_offset += corridor_height + 25
-        
-        # Wrap to next "column" if too many corridors
-        if y_offset > canvas_height - margin:
-            y_offset = margin
+    for node, (x, y) in pos.items():
+        positions[node] = {
+            'x': (x - min_x) * scale + center_x,
+            'y': (y - min_y) * scale + center_y
+        }
     
     state.node_positions = positions
-    print(f"Metro-map layout completed for {num_nodes} nodes")
+    print(f"Force-directed layout completed for {num_nodes} nodes")
 
 
 # ============== Traffic Data ==============

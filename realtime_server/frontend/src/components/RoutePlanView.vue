@@ -1,7 +1,8 @@
 <template>
-  <div class="h-full flex bg-[#0a0e1a]">
+  <Splitpanes class="h-full bg-[#0a0e1a]">
+    <Pane :size="75" :min-size="30">
     <!-- Main Graph Area -->
-    <div class="flex-1 relative overflow-hidden">
+    <div class="h-full relative overflow-hidden">
       <!-- Top Bar -->
       <div class="absolute top-4 left-4 right-4 z-10 flex justify-between items-center">
         <div class="flex items-center gap-4">
@@ -64,10 +65,13 @@
       </div>
     </div>
 
+    </Pane>
+    <Pane :size="25" :min-size="8">
     <!-- Right Sidebar -->
-    <div class="w-80 border-l border-cyan-500/10 flex flex-col bg-[#0d1220]">
+    <Splitpanes horizontal class="h-full bg-[#0d1220]">
+      <Pane :size="40" :min-size="15">
       <!-- Route Input Panel -->
-      <div class="p-4 border-b border-cyan-500/10">
+      <div class="h-full p-4 overflow-auto">
         <div class="text-xs text-slate-500 mb-3 flex items-center gap-2">
           <span class="w-1 h-3 bg-cyan-500 rounded"></span>
           出行需求录入
@@ -112,9 +116,10 @@
           <div v-if="errorMsg" class="text-xs text-red-400 bg-red-500/10 p-2 rounded">{{ errorMsg }}</div>
         </div>
       </div>
-
+      </Pane>
+      <Pane :size="60" :min-size="15">
       <!-- Route Results -->
-      <div class="flex-1 flex flex-col min-h-0 p-4 overflow-auto scrollbar-thin">
+      <div class="h-full p-4 overflow-auto scrollbar-thin">
         <div v-if="routes.length" class="space-y-3">
           <div class="text-xs text-slate-500 mb-1 flex items-center gap-2">
             <span class="w-1 h-3 bg-emerald-500 rounded"></span>
@@ -191,12 +196,16 @@
           </div>
         </div>
       </div>
-    </div>
-  </div>
+      </Pane>
+    </Splitpanes>
+    </Pane>
+  </Splitpanes>
 </template>
 
 <script setup>
 import { ref, reactive, computed, watch, shallowRef, onUnmounted } from 'vue'
+import { Splitpanes, Pane } from 'splitpanes'
+import 'splitpanes/dist/splitpanes.css'
 import { use } from 'echarts/core'
 import { CanvasRenderer } from 'echarts/renderers'
 import { GraphChart, EffectScatterChart, LineChart } from 'echarts/charts'
@@ -260,24 +269,16 @@ const fetchComponents = async () => {
 }
 fetchComponents()
 
-// ============== Node positions (same grid as TopologyView) ==============
-const generateGridPositions = () => {
+// ============== Node positions from backend topology ==============
+const nodePositions = computed(() => {
   const positions = {}
-  const cols = 20
-  const rows = Math.ceil(307 / cols)
-  const width = 700, height = 550
-  const cellW = width / cols, cellH = height / rows
-  const offsetX = 80, offsetY = 80
-  for (let i = 0; i < 307; i++) {
-    const col = i % cols, row = Math.floor(i / cols)
-    positions[i] = {
-      x: offsetX + col * cellW + (Math.random() - 0.5) * cellW * 0.3,
-      y: offsetY + row * cellH + (Math.random() - 0.5) * cellH * 0.3
-    }
+  if (props.topology.nodes && props.topology.nodes.length) {
+    props.topology.nodes.forEach(n => {
+      positions[n.id] = { x: n.x, y: n.y }
+    })
   }
   return positions
-}
-const nodePositions = { value: generateGridPositions() }
+})
 
 // ============== Speed map ==============
 const nodeSpeedMap = computed(() => {
@@ -488,7 +489,6 @@ const chartOption = computed(() => {
   const nodes = []
   for (let i = 0; i < 307; i++) {
     const speed = nodeSpeedMap.value[i] || 60
-    const pos = nodePositions.value[i] || { x: 400, y: 300 }
     const isSource = i === sourceNode.value
     const isTarget = i === targetNode.value
 
@@ -534,6 +534,7 @@ const chartOption = computed(() => {
       shadowBlur = (!dimmed && speed < 20) ? 15 : 0
     }
 
+    const pos = nodePositions.value[i] || { x: 400, y: 300 }
     nodes.push({
       id: String(i),
       name: `传感器 #${i}`,
@@ -641,8 +642,7 @@ const chartOption = computed(() => {
     series: [{
       type: 'graph',
       layout: 'none',
-      animation: true,
-      animationDuration: 300,
+      animation: false,
       data: nodes,
       links: edges,
       roam: true,
@@ -654,7 +654,7 @@ const chartOption = computed(() => {
       },
       blur: { itemStyle: { opacity: 0.3 } },
       label: { show: false },
-      lineStyle: { curveness: 0.2 }
+      lineStyle: { curveness: 0.15, opacity: 0.7 }
     }]
   }
 })

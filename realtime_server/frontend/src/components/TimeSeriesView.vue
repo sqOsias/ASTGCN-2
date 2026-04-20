@@ -1,7 +1,8 @@
 <template>
-  <div class="h-full flex overflow-hidden">
+  <Splitpanes class="h-full">
+    <Pane :size="78" :min-size="30">
     <!-- Left: Charts Area -->
-    <div class="flex-1 flex flex-col p-3 min-w-0">
+    <div class="h-full flex flex-col p-3 min-w-0 overflow-hidden">
       <!-- Header -->
       <div class="flex items-center justify-between mb-2 flex-shrink-0">
         <div class="flex items-center gap-3">
@@ -33,129 +34,151 @@
           </div>
         </div>
       </div>
-      
-      <!-- Main Chart -->
-      <div class="flex-1 cyber-panel min-h-0">
-        <div class="cyber-panel-header py-1.5 text-sm">
-          <el-icon><TrendCharts /></el-icon>
-          Node_{{ currentNode }} 真实 vs 预测车速
-        </div>
-        <v-chart 
-          ref="mainChartRef"
-          class="w-full"
-          style="height: calc(100% - 32px);"
-          :option="mainChartOption" 
-          :autoresize="true"
-        />
-      </div>
-      
-      <!-- Bottom Charts Row -->
-      <div class="h-32 flex gap-2 mt-2 flex-shrink-0">
-        <!-- Residual Chart -->
-        <div class="flex-1 cyber-panel">
-          <div class="cyber-panel-header py-1 text-xs">
-            <el-icon><Histogram /></el-icon>
-            预测误差
+
+      <!-- Main chart + bottom charts: vertical split -->
+      <Splitpanes horizontal class="flex-1 min-h-0">
+        <Pane :size="70" :min-size="20">
+          <!-- Main Chart -->
+          <div class="h-full cyber-panel">
+            <div class="cyber-panel-header py-1.5 text-sm">
+              <el-icon><TrendCharts /></el-icon>
+              Node_{{ currentNode }} 真实 vs 预测车速
+            </div>
+            <v-chart 
+              ref="mainChartRef"
+              class="w-full"
+              style="height: calc(100% - 32px);"
+              :option="mainChartOption" 
+              :autoresize="true"
+            />
           </div>
-          <v-chart 
-            ref="residualChartRef"
-            class="w-full"
-            style="height: calc(100% - 24px);"
-            :option="residualChartOption" 
-            :autoresize="true"
-          />
-        </div>
-        
-        <!-- Multi-step Prediction Comparison -->
-        <div class="flex-1 cyber-panel">
-          <div class="cyber-panel-header py-1 text-xs">
-            <el-icon><Aim /></el-icon>
-            多步预测对比
-          </div>
-          <v-chart 
-            class="w-full"
-            style="height: calc(100% - 24px);"
-            :option="multiStepChartOption" 
-            :autoresize="true"
-          />
-        </div>
-      </div>
+        </Pane>
+        <Pane :size="30" :min-size="10">
+          <!-- Bottom Charts Row: horizontal split -->
+          <Splitpanes class="h-full">
+            <Pane :size="50" :min-size="15">
+              <div class="h-full cyber-panel">
+                <div class="cyber-panel-header py-1 text-xs">
+                  <el-icon><Histogram /></el-icon>
+                  预测误差
+                </div>
+                <v-chart 
+                  ref="residualChartRef"
+                  class="w-full"
+                  style="height: calc(100% - 24px);"
+                  :option="residualChartOption" 
+                  :autoresize="true"
+                />
+              </div>
+            </Pane>
+            <Pane :size="50" :min-size="15">
+              <div class="h-full cyber-panel">
+                <div class="cyber-panel-header py-1 text-xs">
+                  <el-icon><Aim /></el-icon>
+                  多步预测对比
+                </div>
+                <v-chart 
+                  class="w-full"
+                  style="height: calc(100% - 24px);"
+                  :option="multiStepChartOption" 
+                  :autoresize="true"
+                />
+              </div>
+            </Pane>
+          </Splitpanes>
+        </Pane>
+      </Splitpanes>
     </div>
-    
+    </Pane>
+
+    <Pane :size="22" :min-size="8">
     <!-- Right Panel -->
-    <div class="w-56 border-l border-cyan-500/20 flex flex-col p-2 gap-2 flex-shrink-0 overflow-y-auto">
-      <!-- Current Status -->
-      <div class="cyber-panel flex-shrink-0">
-        <div class="cyber-panel-header py-1.5 text-sm">
-          <el-icon><InfoFilled /></el-icon>
-          节点状态
-        </div>
-        <div class="p-2">
-          <div class="text-center mb-2">
-            <div class="text-3xl font-bold" :class="getSpeedClass(currentSpeed)">
-              {{ currentSpeed.toFixed(0) }}
+    <Splitpanes horizontal class="h-full">
+      <Pane :size="30" :min-size="10">
+        <!-- Current Status -->
+        <div class="h-full p-2 overflow-auto">
+          <div class="cyber-panel h-full">
+            <div class="cyber-panel-header py-1.5 text-sm">
+              <el-icon><InfoFilled /></el-icon>
+              节点状态
             </div>
-            <div class="text-slate-400 text-xs">km/h</div>
+            <div class="p-2">
+              <div class="text-center mb-2">
+                <div class="text-3xl font-bold" :class="getSpeedClass(currentSpeed)">
+                  {{ currentSpeed.toFixed(0) }}
+                </div>
+                <div class="text-slate-400 text-xs">km/h</div>
+              </div>
+              <div class="grid grid-cols-2 gap-1.5 text-xs">
+                <div class="bg-slate-800/50 rounded p-1.5 text-center">
+                  <div class="text-cyan-400">{{ historyAvg.toFixed(1) }}</div>
+                  <div class="text-slate-500">均值</div>
+                </div>
+                <div class="bg-slate-800/50 rounded p-1.5 text-center">
+                  <div class="text-cyan-400">{{ mae.toFixed(2) }}</div>
+                  <div class="text-slate-500">MAE</div>
+                </div>
+              </div>
+            </div>
           </div>
-          <div class="grid grid-cols-2 gap-1.5 text-xs">
-            <div class="bg-slate-800/50 rounded p-1.5 text-center">
-              <div class="text-cyan-400">{{ historyAvg.toFixed(1) }}</div>
-              <div class="text-slate-500">均值</div>
-            </div>
-            <div class="bg-slate-800/50 rounded p-1.5 text-center">
-              <div class="text-cyan-400">{{ mae.toFixed(2) }}</div>
-              <div class="text-slate-500">MAE</div>
-            </div>
-          </div>
         </div>
-      </div>
-      
-      <!-- Future Predictions -->
-      <div class="cyber-panel flex-1 min-h-0 flex flex-col">
-        <div class="cyber-panel-header py-1.5 text-sm flex-shrink-0">
-          <el-icon><Timer /></el-icon>
-          未来1h预测
-        </div>
-        <div class="p-2 space-y-1 overflow-y-auto flex-1">
-          <div 
-            v-for="(speed, index) in futurePredictions" 
-            :key="index"
-            class="flex items-center gap-2 text-xs"
-          >
-            <span class="text-slate-500 w-12">+{{ (index + 1) * 5 }}m</span>
-            <div class="flex-1 h-1.5 bg-slate-800 rounded overflow-hidden">
+      </Pane>
+      <Pane :size="50" :min-size="15">
+        <!-- Future Predictions -->
+        <div class="h-full p-2 overflow-auto">
+          <div class="cyber-panel h-full flex flex-col">
+            <div class="cyber-panel-header py-1.5 text-sm flex-shrink-0">
+              <el-icon><Timer /></el-icon>
+              未来1h预测
+            </div>
+            <div class="p-2 space-y-1 overflow-y-auto flex-1">
               <div 
-                class="h-full transition-all duration-300"
-                :class="getSpeedBgClass(speed)"
-                :style="{ width: Math.min(100, speed / 1.8) + '%' }"
-              ></div>
+                v-for="(speed, index) in futurePredictions" 
+                :key="index"
+                class="flex items-center gap-2 text-xs"
+              >
+                <span class="text-slate-500 w-12">+{{ (index + 1) * 5 }}m</span>
+                <div class="flex-1 h-1.5 bg-slate-800 rounded overflow-hidden">
+                  <div 
+                    class="h-full transition-all duration-300"
+                    :class="getSpeedBgClass(speed)"
+                    :style="{ width: Math.min(100, speed / 1.8) + '%' }"
+                  ></div>
+                </div>
+                <span class="w-10 text-right font-mono" :class="getSpeedClass(speed)">
+                  {{ speed.toFixed(0) }}
+                </span>
+              </div>
             </div>
-            <span class="w-10 text-right font-mono" :class="getSpeedClass(speed)">
-              {{ speed.toFixed(0) }}
-            </span>
           </div>
         </div>
-      </div>
-      
-      <!-- Trend -->
-      <div class="cyber-panel flex-shrink-0">
-        <div class="cyber-panel-header py-1 text-xs">
-          <el-icon><DataLine /></el-icon>
-          趋势
-        </div>
-        <div class="p-2 text-center">
-          <span class="font-bold text-lg" :class="trendClass">{{ trendLabel }}</span>
-          <div class="text-xs text-slate-500">
-            预计{{ trendDelta > 0 ? '+' : '' }}{{ trendDelta.toFixed(1) }} km/h
+      </Pane>
+      <Pane :size="20" :min-size="8">
+        <!-- Trend -->
+        <div class="h-full p-2 overflow-auto">
+          <div class="cyber-panel h-full">
+            <div class="cyber-panel-header py-1 text-xs">
+              <el-icon><DataLine /></el-icon>
+              趋势
+            </div>
+            <div class="p-2 text-center">
+              <span class="font-bold text-lg" :class="trendClass">{{ trendLabel }}</span>
+              <div class="text-xs text-slate-500">
+                预计{{ trendDelta > 0 ? '+' : '' }}{{ trendDelta.toFixed(1) }} km/h
+              </div>
+            </div>
           </div>
         </div>
-      </div>
-    </div>
-  </div>
+      </Pane>
+    </Splitpanes>
+    </Pane>
+  </Splitpanes>
 </template>
 
 <script setup>
 import { ref, computed, watch, shallowRef } from 'vue'
+import { Splitpanes, Pane } from 'splitpanes'
+import 'splitpanes/dist/splitpanes.css'
 import { use } from 'echarts/core'
 import { CanvasRenderer } from 'echarts/renderers'
 import { LineChart, BarChart } from 'echarts/charts'

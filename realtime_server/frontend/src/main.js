@@ -6,6 +6,26 @@ import * as ElementPlusIconsVue from '@element-plus/icons-vue'
 import App from './App.vue'
 import './style.css'
 
+// Suppress harmless ResizeObserver loop error (common with ECharts + splitpanes)
+// This error is benign – it means a resize callback couldn't finish in one frame.
+const _ro = window.ResizeObserver
+window.ResizeObserver = class extends _ro {
+  constructor(cb) {
+    super((entries, observer) => {
+      // Wrap callback in requestAnimationFrame to avoid the loop warning
+      window.requestAnimationFrame(() => { cb(entries, observer) })
+    })
+  }
+}
+// Belt-and-suspenders: also suppress at the event level (capture phase)
+window.addEventListener('error', (e) => {
+  if (e.message?.includes?.('ResizeObserver')) {
+    e.stopImmediatePropagation()
+    e.stopPropagation()
+    e.preventDefault()
+  }
+}, true)
+
 console.log('[main.js] Creating Vue app...')
 
 const app = createApp(App)

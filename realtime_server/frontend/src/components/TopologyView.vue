@@ -1,7 +1,8 @@
 <template>
-  <div class="h-full flex bg-[#0a0e1a]">
+  <Splitpanes class="h-full bg-[#0a0e1a]">
+    <Pane :size="76" :min-size="30">
     <!-- Main Graph Area -->
-    <div class="flex-1 relative overflow-hidden">
+    <div class="h-full relative overflow-hidden">
       <!-- Top Control Bar -->
       <div class="absolute top-4 left-4 right-4 z-10 flex justify-between items-center">
         <!-- Left: Title & Mode -->
@@ -102,119 +103,128 @@
       </div>
     </div>
     
+    </Pane>
+    <Pane :size="24" :min-size="8">
     <!-- Right Sidebar -->
-    <div class="w-72 border-l border-cyan-500/10 flex flex-col bg-[#0d1220]">
-      <!-- Metrics Panel -->
-      <div class="p-4 border-b border-cyan-500/10">
-        <div class="text-xs text-slate-500 mb-3 flex items-center gap-2">
-          <span class="w-1 h-3 bg-cyan-500 rounded"></span>
-          实时误差回溯
-        </div>
-        <div class="grid grid-cols-2 gap-3">
-          <div class="bg-slate-900/50 rounded-lg p-3 text-center">
-            <div class="text-2xl font-mono font-bold text-cyan-400">{{ metrics.mae.toFixed(2) }}</div>
-            <div class="text-[10px] text-slate-500 mt-1">MAE (km/h)</div>
+    <Splitpanes horizontal class="h-full bg-[#0d1220]">
+      <Pane :size="28" :min-size="10">
+        <!-- Metrics Panel -->
+        <div class="h-full p-4 overflow-auto">
+          <div class="text-xs text-slate-500 mb-3 flex items-center gap-2">
+            <span class="w-1 h-3 bg-cyan-500 rounded"></span>
+            实时误差回溯
           </div>
-          <div class="bg-slate-900/50 rounded-lg p-3 text-center">
-            <div class="text-2xl font-mono font-bold text-purple-400">{{ metrics.rmse.toFixed(2) }}</div>
-            <div class="text-[10px] text-slate-500 mt-1">RMSE (km/h)</div>
-          </div>
-        </div>
-        <!-- Accuracy Bar -->
-        <div class="mt-3">
-          <div class="flex justify-between text-[10px] text-slate-500 mb-1">
-            <span>精度评级</span>
-            <span :class="accuracyTextColor">{{ accuracyLabel }}</span>
-          </div>
-          <div class="h-1.5 bg-slate-800 rounded-full overflow-hidden">
-            <div 
-              class="h-full transition-all duration-700 rounded-full"
-              :class="accuracyColor"
-              :style="{ width: accuracyPercent + '%' }"
-            ></div>
-          </div>
-        </div>
-      </div>
-      
-      <!-- Congestion Forecast -->
-      <div class="flex-1 flex flex-col min-h-0 p-4">
-        <div class="text-xs text-slate-500 mb-3 flex items-center gap-2">
-          <span class="w-1 h-3 bg-red-500 rounded"></span>
-          未来1h拥堵预警
-        </div>
-        <div class="flex-1 overflow-auto space-y-2 scrollbar-thin">
-          <div 
-            v-for="(node, index) in topCongested" 
-            :key="node.node_id"
-            class="group flex items-center gap-2 p-2 rounded-lg bg-slate-900/30 hover:bg-red-500/10 cursor-pointer transition-all duration-300 border border-transparent hover:border-red-500/30"
-            @click="focusOnNode(node.node_id)"
-          >
-            <div 
-              class="w-5 h-5 rounded flex items-center justify-center text-[10px] font-bold shrink-0"
-              :class="index === 0 ? 'bg-red-500 text-white' : 'bg-slate-800 text-slate-400'"
-            >
-              {{ index + 1 }}
+          <div class="grid grid-cols-2 gap-3">
+            <div class="bg-slate-900/50 rounded-lg p-3 text-center">
+              <div class="text-2xl font-mono font-bold text-cyan-400">{{ metrics.mae.toFixed(2) }}</div>
+              <div class="text-[10px] text-slate-500 mt-1">MAE (km/h)</div>
             </div>
-            <div class="flex-1 min-w-0">
-              <div class="text-xs font-medium text-slate-300 truncate">传感器 #{{ node.node_id }}</div>
-              <div class="text-[10px] text-slate-500">当前 {{ node.current_speed?.toFixed(0) }} km/h</div>
+            <div class="bg-slate-900/50 rounded-lg p-3 text-center">
+              <div class="text-2xl font-mono font-bold text-purple-400">{{ metrics.rmse.toFixed(2) }}</div>
+              <div class="text-[10px] text-slate-500 mt-1">RMSE (km/h)</div>
             </div>
-            <div class="text-right shrink-0">
-              <div class="text-sm font-mono font-bold" :class="getSpeedTextColor(node.avg_speed)">{{ node.avg_speed?.toFixed(0) }}</div>
-              <div class="text-[10px] text-slate-600">预测</div>
+          </div>
+          <!-- Accuracy Bar -->
+          <div class="mt-3">
+            <div class="flex justify-between text-[10px] text-slate-500 mb-1">
+              <span>精度评级</span>
+              <span :class="accuracyTextColor">{{ accuracyLabel }}</span>
             </div>
-            <div class="w-1.5 h-8 bg-slate-800 rounded-full overflow-hidden shrink-0">
+            <div class="h-1.5 bg-slate-800 rounded-full overflow-hidden">
               <div 
-                class="w-full bg-gradient-to-t from-red-500 to-red-400 rounded-full transition-all"
-                :style="{ height: Math.min(100, (1 - node.avg_speed / 60) * 100) + '%' }"
+                class="h-full transition-all duration-700 rounded-full"
+                :class="accuracyColor"
+                :style="{ width: accuracyPercent + '%' }"
               ></div>
             </div>
           </div>
-          
-          <div v-if="topCongested.length === 0" class="text-center text-slate-600 py-8">
-            <div class="text-2xl mb-2">◌</div>
-            <div class="text-xs">等待数据...</div>
+        </div>
+      </Pane>
+      <Pane :size="52" :min-size="15">
+        <!-- Congestion Forecast -->
+        <div class="h-full flex flex-col p-4 overflow-hidden">
+          <div class="text-xs text-slate-500 mb-3 flex items-center gap-2 flex-shrink-0">
+            <span class="w-1 h-3 bg-red-500 rounded"></span>
+            未来1h拥堵预警
+          </div>
+          <div class="flex-1 overflow-auto space-y-2 scrollbar-thin">
+            <div 
+              v-for="(node, index) in topCongested" 
+              :key="node.node_id"
+              class="group flex items-center gap-2 p-2 rounded-lg bg-slate-900/30 hover:bg-red-500/10 cursor-pointer transition-all duration-300 border border-transparent hover:border-red-500/30"
+              @click="focusOnNode(node.node_id)"
+            >
+              <div 
+                class="w-5 h-5 rounded flex items-center justify-center text-[10px] font-bold shrink-0"
+                :class="index === 0 ? 'bg-red-500 text-white' : 'bg-slate-800 text-slate-400'"
+              >
+                {{ index + 1 }}
+              </div>
+              <div class="flex-1 min-w-0">
+                <div class="text-xs font-medium text-slate-300 truncate">传感器 #{{ node.node_id }}</div>
+                <div class="text-[10px] text-slate-500">当前 {{ node.current_speed?.toFixed(0) }} km/h</div>
+              </div>
+              <div class="text-right shrink-0">
+                <div class="text-sm font-mono font-bold" :class="getSpeedTextColor(node.avg_speed)">{{ node.avg_speed?.toFixed(0) }}</div>
+                <div class="text-[10px] text-slate-600">预测</div>
+              </div>
+              <div class="w-1.5 h-8 bg-slate-800 rounded-full overflow-hidden shrink-0">
+                <div 
+                  class="w-full bg-gradient-to-t from-red-500 to-red-400 rounded-full transition-all"
+                  :style="{ height: Math.min(100, (1 - node.avg_speed / 60) * 100) + '%' }"
+                ></div>
+              </div>
+            </div>
+            
+            <div v-if="topCongested.length === 0" class="text-center text-slate-600 py-8">
+              <div class="text-2xl mb-2">◌</div>
+              <div class="text-xs">等待数据...</div>
+            </div>
           </div>
         </div>
-      </div>
-      
-      <!-- Network Overview -->
-      <div class="p-4 border-t border-cyan-500/10">
-        <div class="text-xs text-slate-500 mb-3 flex items-center gap-2">
-          <span class="w-1 h-3 bg-emerald-500 rounded"></span>
-          全网态势
+      </Pane>
+      <Pane :size="20" :min-size="8">
+        <!-- Network Overview -->
+        <div class="h-full p-4 overflow-auto">
+          <div class="text-xs text-slate-500 mb-3 flex items-center gap-2">
+            <span class="w-1 h-3 bg-emerald-500 rounded"></span>
+            全网态势
+          </div>
+          <div class="flex justify-between items-end">
+            <div class="text-center">
+              <div class="text-xl font-bold text-emerald-400">{{ networkStats.smooth }}</div>
+              <div class="text-[10px] text-slate-500">畅通</div>
+            </div>
+            <div class="text-center">
+              <div class="text-xl font-bold text-amber-400">{{ networkStats.slow }}</div>
+              <div class="text-[10px] text-slate-500">缓行</div>
+            </div>
+            <div class="text-center">
+              <div class="text-xl font-bold text-red-400">{{ networkStats.congested }}</div>
+              <div class="text-[10px] text-slate-500">拥堵</div>
+            </div>
+            <div class="text-center">
+              <div class="text-xl font-bold text-slate-400">{{ totalNodes }}</div>
+              <div class="text-[10px] text-slate-500">总计</div>
+            </div>
+          </div>
+          <!-- Mini Progress -->
+          <div class="mt-3 h-1.5 bg-slate-800 rounded-full overflow-hidden flex">
+            <div class="bg-emerald-500 transition-all" :style="{ width: (networkStats.smooth / totalNodes * 100) + '%' }"></div>
+            <div class="bg-amber-500 transition-all" :style="{ width: (networkStats.slow / totalNodes * 100) + '%' }"></div>
+            <div class="bg-red-500 transition-all" :style="{ width: (networkStats.congested / totalNodes * 100) + '%' }"></div>
+          </div>
         </div>
-        <div class="flex justify-between items-end">
-          <div class="text-center">
-            <div class="text-xl font-bold text-emerald-400">{{ networkStats.smooth }}</div>
-            <div class="text-[10px] text-slate-500">畅通</div>
-          </div>
-          <div class="text-center">
-            <div class="text-xl font-bold text-amber-400">{{ networkStats.slow }}</div>
-            <div class="text-[10px] text-slate-500">缓行</div>
-          </div>
-          <div class="text-center">
-            <div class="text-xl font-bold text-red-400">{{ networkStats.congested }}</div>
-            <div class="text-[10px] text-slate-500">拥堵</div>
-          </div>
-          <div class="text-center">
-            <div class="text-xl font-bold text-slate-400">{{ totalNodes }}</div>
-            <div class="text-[10px] text-slate-500">总计</div>
-          </div>
-        </div>
-        <!-- Mini Progress -->
-        <div class="mt-3 h-1.5 bg-slate-800 rounded-full overflow-hidden flex">
-          <div class="bg-emerald-500 transition-all" :style="{ width: (networkStats.smooth / totalNodes * 100) + '%' }"></div>
-          <div class="bg-amber-500 transition-all" :style="{ width: (networkStats.slow / totalNodes * 100) + '%' }"></div>
-          <div class="bg-red-500 transition-all" :style="{ width: (networkStats.congested / totalNodes * 100) + '%' }"></div>
-        </div>
-      </div>
-    </div>
-  </div>
+      </Pane>
+    </Splitpanes>
+    </Pane>
+  </Splitpanes>
 </template>
 
 <script setup>
 import { ref, computed, watch, shallowRef } from 'vue'
+import { Splitpanes, Pane } from 'splitpanes'
+import 'splitpanes/dist/splitpanes.css'
 import { use } from 'echarts/core'
 import { CanvasRenderer } from 'echarts/renderers'
 import { GraphChart, EffectScatterChart } from 'echarts/charts'
@@ -368,31 +378,16 @@ const accuracyLabel = computed(() => {
   return '需改进'
 })
 
-// Generate uniform grid positions for starfield mode
-const generateGridPositions = () => {
+// Use backend-computed stable positions (metro-map layout)
+const nodePositions = computed(() => {
   const positions = {}
-  const cols = 20
-  const rows = Math.ceil(totalNodes / cols)
-  const width = 700
-  const height = 550
-  const cellW = width / cols
-  const cellH = height / rows
-  const offsetX = 80
-  const offsetY = 80
-  
-  for (let i = 0; i < totalNodes; i++) {
-    const col = i % cols
-    const row = Math.floor(i / cols)
-    // Add slight randomness for organic feel
-    positions[i] = {
-      x: offsetX + col * cellW + (Math.random() - 0.5) * cellW * 0.3,
-      y: offsetY + row * cellH + (Math.random() - 0.5) * cellH * 0.3
-    }
+  if (props.topology.nodes && props.topology.nodes.length) {
+    props.topology.nodes.forEach(n => {
+      positions[n.id] = { x: n.x, y: n.y }
+    })
   }
   return positions
-}
-
-const nodePositions = { value: generateGridPositions() }
+})
 
 // ECharts option
 const chartOption = computed(() => {
@@ -404,7 +399,6 @@ const chartOption = computed(() => {
   const nodes = []
   for (let i = 0; i < totalNodes; i++) {
     const speed = nodeSpeedMap.value[i] || 60
-    const pos = nodePositions.value[i] || { x: 400, y: 300 }
     const isCongested = speed < 20
     const isTop5 = top5Ids.includes(i)
     const inEpicenter = epicenterSet.has(i)
@@ -412,6 +406,7 @@ const chartOption = computed(() => {
     // In epicenter mode, hide non-epicenter nodes
     if (isEpicenter && !inEpicenter) continue
     
+    const pos = nodePositions.value[i] || { x: 400, y: 300 }
     nodes.push({
       id: String(i),
       name: `传感器 #${i}`,
@@ -499,8 +494,7 @@ const chartOption = computed(() => {
     series: [{
       type: 'graph',
       layout: 'none',
-      animation: true,
-      animationDuration: 500,
+      animation: false,
       data: nodes,
       links: edges,
       roam: true,
@@ -516,7 +510,8 @@ const chartOption = computed(() => {
       },
       label: { show: false },
       lineStyle: {
-        curveness: 0.2
+        curveness: 0.15,
+        opacity: 0.7
       }
     }]
   }
