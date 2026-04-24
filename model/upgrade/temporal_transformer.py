@@ -38,9 +38,18 @@ class ProbSparseAttention(nn.Module):
 
         # ProbSparse核心: 动态计算采样数量与 Top-u 的限制
         # 计算采样数量：U_part = factor * log(L)，但不超过 L 本身
-        U_part = self.factor * int(math.ceil(math.log(L))) 
-        u = min(U_part, L)
-        sample_k = min(U_part, L)
+        # U_part = self.factor * int(math.ceil(math.log(L))) 
+        # u = min(U_part, L)
+        # sample_k = min(U_part, L)
+
+        # [修复] 增加对极短序列 (L=1) 的兜底保护，防止 log(1)=0 导致崩溃
+        L_safe = max(L, 2)  # 强制 L 至少按 2 计算对数
+        U_part = self.factor * int(math.ceil(math.log(L_safe))) 
+        
+        # 确保采样数量和 top-u 至少为 1，且不超过序列总长 L
+        u = max(1, min(U_part, L))
+        sample_k = max(1, min(U_part, L))
+        
 
         # 稀疏性评估：从 Key 中随机选取少量子集
         K_sample = K[:, :, torch.randperm(L)[:sample_k], :]
