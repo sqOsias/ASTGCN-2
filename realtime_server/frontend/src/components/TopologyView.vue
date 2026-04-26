@@ -210,9 +210,9 @@
           </div>
           <!-- Mini Progress -->
           <div class="mt-3 h-1.5 bg-slate-800 rounded-full overflow-hidden flex">
-            <div class="bg-emerald-500 transition-all" :style="{ width: (networkStats.smooth / totalNodes * 100) + '%' }"></div>
-            <div class="bg-amber-500 transition-all" :style="{ width: (networkStats.slow / totalNodes * 100) + '%' }"></div>
-            <div class="bg-red-500 transition-all" :style="{ width: (networkStats.congested / totalNodes * 100) + '%' }"></div>
+            <div class="bg-emerald-500 transition-all" :style="{ width: totalNodes > 0 ? (networkStats.smooth / totalNodes * 100) + '%' : '0%' }"></div>
+            <div class="bg-amber-500 transition-all" :style="{ width: totalNodes > 0 ? (networkStats.slow / totalNodes * 100) + '%' : '0%' }"></div>
+            <div class="bg-red-500 transition-all" :style="{ width: totalNodes > 0 ? (networkStats.congested / totalNodes * 100) + '%' : '0%' }"></div>
           </div>
         </div>
       </Pane>
@@ -245,7 +245,7 @@ const emit = defineEmits(['node-click'])
 const chartRef = shallowRef(null)
 const viewMode = ref('current')
 const epicenterMode = ref(false)
-const totalNodes = 307
+const totalNodes = computed(() => props.topology.nodes?.length || 0)
 
 // Replay state
 const isReplaying = ref(false)
@@ -397,7 +397,7 @@ const chartOption = computed(() => {
   
   // Build nodes
   const nodes = []
-  for (let i = 0; i < totalNodes; i++) {
+  for (let i = 0; i < totalNodes.value; i++) {
     const speed = nodeSpeedMap.value[i] || 60
     const isCongested = speed < 20
     const isTop5 = top5Ids.includes(i)

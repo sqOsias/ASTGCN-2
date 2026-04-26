@@ -111,6 +111,7 @@ def load_data():
     time_features = _build_time_features(
         raw_data.shape[0], raw_data.shape[1], CONFIG['points_per_hour'])
     state.all_data = np.concatenate([raw_data, time_features], axis=2)  # Shape: (T, N, 5)
+    CONFIG['num_input_features'] = int(state.all_data.shape[2])
     
     # Speed is in mph, convert to km/h for display (1 mph = 1.609 km/h)
     state.speed_data = raw_data[:, :, 2] * 1.609  # Speed feature (index 2), converted to km/h
@@ -122,10 +123,11 @@ def load_data():
     
     print(f"Data loaded: shape={state.all_data.shape}, num_features={state.all_data.shape[2]}")
     
-    # Initialize sliding window with first 36 frames
-    for i in range(36):
+    # Initialize sliding window with first history window
+    warmup_steps = min(CONFIG['history_steps'], state.all_data.shape[0])
+    for i in range(warmup_steps):
         state.sliding_window.append(state.all_data[i])
-    state.current_index = 36
+    state.current_index = warmup_steps
     
     # Generate synthetic attention matrix
     generate_attention_matrix()

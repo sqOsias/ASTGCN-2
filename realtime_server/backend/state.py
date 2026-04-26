@@ -24,10 +24,12 @@ class SystemState:
         self.all_data = None  # Full dataset
         self.speed_data = None  # Speed-only data for display
         self.current_index = 0  # Current position in dataset
-        self.sliding_window = deque(maxlen=36)  # 36 time steps = 3 hours
+        self.history_steps = 36
+        self.prediction_steps = 12
+        self.sliding_window = deque(maxlen=self.history_steps)
         
         # History for metrics calculation
-        self.prediction_history = deque(maxlen=12)  # Store past predictions
+        self.prediction_history = deque(maxlen=self.prediction_steps)
         self.real_history = deque(maxlen=48)  # Store real values for comparison
         
         # Statistics for normalization
@@ -44,6 +46,14 @@ class SystemState:
         
         # Attention matrix cache
         self.attention_matrix = None
+
+    def configure_runtime(self, history_steps: int, prediction_steps: int):
+        """Reconfigure dynamic buffers based on loaded model settings."""
+        self.history_steps = int(history_steps)
+        self.prediction_steps = int(prediction_steps)
+        self.sliding_window = deque(maxlen=self.history_steps)
+        self.prediction_history = deque(maxlen=self.prediction_steps)
+        self.real_history = deque(maxlen=max(self.prediction_steps * 4, self.history_steps + self.prediction_steps))
 
 
 # Singleton instance

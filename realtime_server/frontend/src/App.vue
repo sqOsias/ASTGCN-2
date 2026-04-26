@@ -72,6 +72,7 @@
             :selectedNode="selectedNode"
             :networkData="networkData"
             :historyBuffer="historyBuffer"
+            :nodeCount="topology.nodes.length"
             @select-node="handleNodeSelect"
           />
         </el-tab-pane>

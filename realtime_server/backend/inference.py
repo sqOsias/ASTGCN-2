@@ -20,31 +20,34 @@ def run_inference():
         return np.zeros((num_nodes, num_pred_steps))
     
     try:
-        window_data = np.array(list(state.sliding_window))  # (36, N, 5)
+        window_data = np.array(list(state.sliding_window))
         
         # Prepare input: normalize
         normalized = (window_data - state.mean) / state.std  # (36, N, 5)
         
         # Build week/day/hour inputs matching training data format
-        # week input: last 12 steps (1 week ago approximated by recent data)
-        week_len = CONFIG['num_of_weeks'] * points_per_hour  # 12
-        day_len = CONFIG['num_of_days'] * points_per_hour     # 12
-        hour_len = CONFIG['num_of_hours'] * points_per_hour   # 36
+        week_len = CONFIG['num_of_weeks'] * points_per_hour
+        day_len = CONFIG['num_of_days'] * points_per_hour
+        hour_len = CONFIG['num_of_hours'] * points_per_hour
+
+        required_len = max(week_len, day_len, hour_len)
+        if window_data.shape[0] < required_len:
+            return _fallback_prediction(num_nodes, num_pred_steps)
         
-        hour_data = normalized[-hour_len:]  # (36, N, 5)
-        day_data = normalized[-day_len:]    # (12, N, 5)
-        week_data = normalized[-week_len:]  # (12, N, 5)
+        hour_data = normalized[-hour_len:]
+        day_data = normalized[-day_len:]
+        week_data = normalized[-week_len:]
         
         # Reshape to (1, N, F, T) matching model input format
-        week_input = torch.from_numpy(week_data).float().permute(1, 2, 0).unsqueeze(0).to(state.device)  # (1, N, 5, 12)
-        day_input = torch.from_numpy(day_data).float().permute(1, 2, 0).unsqueeze(0).to(state.device)    # (1, N, 5, 12)
-        hour_input = torch.from_numpy(hour_data).float().permute(1, 2, 0).unsqueeze(0).to(state.device)  # (1, N, 5, 36)
+        week_input = torch.from_numpy(week_data).float().permute(1, 2, 0).unsqueeze(0).to(state.device)
+        day_input = torch.from_numpy(day_data).float().permute(1, 2, 0).unsqueeze(0).to(state.device)
+        hour_input = torch.from_numpy(hour_data).float().permute(1, 2, 0).unsqueeze(0).to(state.device)
         
         with torch.no_grad():
-            output = state.model([week_input, day_input, hour_input])  # (1, N, 12)
+            output = state.model([week_input, day_input, hour_input])
         
         # Output is predicted speed (already in raw scale after model)
-        predictions = output.squeeze(0).cpu().numpy()  # (N, 12)
+        predictions = output.squeeze(0).cpu().numpy()
         
         # Convert to km/h for display
         predictions = predictions * 1.609
@@ -74,7 +77,8 @@ def _fallback_prediction(num_nodes, num_pred_steps):
 
 def calculate_metrics():
     """Calculate real-time MAE and RMSE from prediction history"""
-    if len(state.prediction_history) < 1 or len(state.real_history) < 13:
+    required_real = max(CONFIG['num_for_predict'] + 1, 2)
+    if len(state.prediction_history) < 1 or len(state.real_history) < required_real:
         return 0.0, 0.0
     
     # Get predictions made 12 steps ago and compare with actual values

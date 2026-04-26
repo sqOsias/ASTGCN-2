@@ -20,7 +20,7 @@ async def simulation_loop():
         try:
             # Check if we have data left
             if state.current_index >= len(state.all_data):
-                state.current_index = 36  # Loop back
+                state.current_index = state.history_steps  # Loop back
             
             # Get current data (all features for model, speed for display)
             current_frame = state.all_data[state.current_index]  # All features

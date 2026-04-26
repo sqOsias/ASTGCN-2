@@ -16,7 +16,7 @@
             @change="handleNodeChange"
           >
             <el-option 
-              v-for="i in 307" 
+              v-for="i in nodeCount" 
               :key="i - 1" 
               :label="`Node_${i - 1}`" 
               :value="i - 1"
@@ -204,7 +204,8 @@ use([
 const props = defineProps({
   selectedNode: { type: Number, default: 0 },
   networkData: { type: Array, default: () => [] },
-  historyBuffer: { type: Array, default: () => [] }
+  historyBuffer: { type: Array, default: () => [] },
+  nodeCount: { type: Number, default: 0 }
 })
 
 const emit = defineEmits(['select-node'])

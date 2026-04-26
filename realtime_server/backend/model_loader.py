@@ -8,9 +8,10 @@ import os
 import torch
 
 from model.astgcn import ASTGCN
+from model.upgrade.astgcn_upgrade import UpgradeASTGCN
 from lib.utils import get_adjacency_matrix, scaled_Laplacian, cheb_polynomial
 
-from config import CONFIG
+from config import CONFIG, load_model_runtime_config
 from state import state
 from data_loader import load_edge_list
 
@@ -18,6 +19,9 @@ from data_loader import load_edge_list
 def load_model():
     """Load ASTGCN model and prepare for inference"""
     print("Loading model...")
+
+    load_model_runtime_config()
+    state.configure_runtime(CONFIG['history_steps'], CONFIG['num_for_predict'])
     
     # Determine device
     state.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -65,14 +69,32 @@ def load_model():
     
     # Create model (3 submodules for week, day, hour, each with 2 blocks)
     all_backbones = [
-        make_backbone_pair(CONFIG['num_of_weeks']),   # week: stride=1
-        make_backbone_pair(CONFIG['num_of_days']),    # day: stride=1
-        make_backbone_pair(CONFIG['num_of_hours']),   # hour: stride=3
+        make_backbone_pair(CONFIG['num_of_weeks']),
+        make_backbone_pair(CONFIG['num_of_days']),
+        make_backbone_pair(CONFIG['num_of_hours']),
     ]
-    state.model = ASTGCN(
-        num_for_prediction=CONFIG['num_for_predict'],
-        all_backbones=all_backbones
-    ).to(state.device)
+
+    if CONFIG['spatial_mode'] == 0 and CONFIG['temporal_mode'] == 0:
+        state.model = ASTGCN(
+            num_for_prediction=CONFIG['num_for_predict'],
+            all_backbones=all_backbones
+        ).to(state.device)
+        print("Using base ASTGCN architecture")
+    else:
+        state.model = UpgradeASTGCN(
+            num_of_features=CONFIG['num_input_features'],
+            num_for_prediction=CONFIG['num_for_predict'],
+            all_backbones=all_backbones,
+            num_of_vertices=CONFIG['num_of_vertices'],
+            spatial_mode=CONFIG['spatial_mode'],
+            temporal_mode=CONFIG['temporal_mode'],
+            adaptive_graph_cfg=CONFIG['adaptive_graph_cfg'],
+            transformer_cfg=CONFIG['transformer_cfg'],
+        ).to(state.device)
+        print(
+            "Using UpgradeASTGCN architecture",
+            f"(spatial_mode={CONFIG['spatial_mode']}, temporal_mode={CONFIG['temporal_mode']})"
+        )
     
     # Warm up model with dummy input to initialize lazy parameters BEFORE loading weights
     _warmup_model()
@@ -99,11 +121,9 @@ def _warmup_model():
     """Warm up model with dummy input to initialize lazy parameters"""
     print("Warming up model...")
     with torch.no_grad():
-        # Create dummy inputs matching training data shape
-        # Training adds 2 time features (time_of_day, day_of_week) to 3 raw features = 5 total
         batch_size = 1
         num_vertices = CONFIG['num_of_vertices']
-        num_features = 5  # 3 raw (flow, occupy, speed) + 2 time features
+        num_features = CONFIG['num_input_features']
         
         dummy_week = torch.randn(batch_size, num_vertices, num_features, CONFIG['num_of_weeks'] * CONFIG['points_per_hour']).to(state.device)
         dummy_day = torch.randn(batch_size, num_vertices, num_features, CONFIG['num_of_days'] * CONFIG['points_per_hour']).to(state.device)

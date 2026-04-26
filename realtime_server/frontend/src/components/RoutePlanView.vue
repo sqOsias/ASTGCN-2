@@ -240,6 +240,7 @@ const wasPaused = ref(false) // track if simulation was already paused before pl
 
 const routeColors = ['#00f2ff', '#ff8c00', '#c050ff']
 const routeLabels = ['最优推荐路线', '备选路线 A', '备选路线 B']
+const totalNodes = computed(() => props.topology.nodes?.length || 0)
 
 let animTimers = []
 
@@ -248,7 +249,7 @@ const componentGroups = computed(() => {
   if (components.value.length === 0) {
     // Fallback: single group with all nodes
     const all = []
-    for (let i = 0; i < 307; i++) all.push(i)
+    for (let i = 0; i < totalNodes.value; i++) all.push(i)
     return [{ label: '全部节点', nodes: all }]
   }
   return components.value.map(c => ({
@@ -487,7 +488,7 @@ const chartOption = computed(() => {
 
   // Build nodes
   const nodes = []
-  for (let i = 0; i < 307; i++) {
+  for (let i = 0; i < totalNodes.value; i++) {
     const speed = nodeSpeedMap.value[i] || 60
     const isSource = i === sourceNode.value
     const isTarget = i === targetNode.value

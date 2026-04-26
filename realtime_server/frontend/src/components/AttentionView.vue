@@ -12,7 +12,7 @@
           <div class="flex items-center gap-1.5">
             <span class="w-1.5 h-1.5 rounded-full bg-cyan-500"></span>
             <span class="text-slate-500">矩阵维度</span>
-            <span class="text-cyan-400 font-mono">307×307</span>
+            <span class="text-cyan-400 font-mono">{{ matrixSize }}×{{ matrixSize }}</span>
           </div>
           <div class="flex items-center gap-1.5">
             <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
@@ -35,7 +35,7 @@
           <span class="text-xs text-slate-500">查看节点:</span>
           <el-input-number
             v-model="focusNode"
-            :min="0" :max="306"
+            :min="0" :max="Math.max(0, matrixSize - 1)"
             size="small"
             style="width: 100px"
             @change="onFocusNodeChange"
@@ -213,6 +213,7 @@ const selectedPair = ref(null)
 const topConnections = ref([])
 const focusNode = ref(0)
 const focusNeighbors = ref([]) // top-N attention neighbors for focusNode
+const matrixSize = ref(0)
 
 // Statistics
 const nonZeroCount = ref(0)
@@ -228,6 +229,7 @@ const fetchAttentionMatrix = async () => {
 
     const matrix = data.matrix
     const size = data.size
+    matrixSize.value = size
     rawMatrix.value = matrix
 
     let sum = 0, count = 0, max = 0
@@ -295,7 +297,8 @@ const nodePositions = computed(() => {
 
 // ============== Heatmap ==============
 const heatmapOption = computed(() => {
-  const sampledSize = Math.ceil(307 / 3)
+  const sampleRate = 3
+  const sampledSize = Math.ceil((matrixSize.value || 0) / sampleRate)
   return {
     backgroundColor: 'transparent',
     tooltip: {
@@ -306,13 +309,13 @@ const heatmapOption = computed(() => {
       textStyle: { color: '#e2e8f0', fontSize: 11 },
       formatter: (params) => {
         const [x, y, val] = params.data
-        return `<b>Node_${x * 3} → Node_${y * 3}</b><br/>注意力权重: <span style="color:#f97316">${val.toFixed(4)}</span>`
+        return `<b>Node_${x * sampleRate} → Node_${y * sampleRate}</b><br/>注意力权重: <span style="color:#f97316">${val.toFixed(4)}</span>`
       }
     },
     grid: { left: 50, right: 70, top: 15, bottom: 50 },
     xAxis: {
       type: 'category',
-      data: Array.from({ length: sampledSize }, (_, i) => i * 3),
+      data: Array.from({ length: sampledSize }, (_, i) => i * sampleRate),
       splitArea: { show: false },
       axisLine: { lineStyle: { color: '#1e293b' } },
       axisLabel: { color: '#475569', fontSize: 8, interval: 9, rotate: 45 },
@@ -321,7 +324,7 @@ const heatmapOption = computed(() => {
     },
     yAxis: {
       type: 'category',
-      data: Array.from({ length: sampledSize }, (_, i) => i * 3),
+      data: Array.from({ length: sampledSize }, (_, i) => i * sampleRate),
       splitArea: { show: false },
       axisLine: { lineStyle: { color: '#1e293b' } },
       axisLabel: { color: '#475569', fontSize: 8, interval: 9 },
@@ -354,7 +357,7 @@ const graphOption = computed(() => {
   focusNeighbors.value.forEach(n => { neighborWeights[n.node] = n.weight })
 
   const nodes = []
-  for (let i = 0; i < 307; i++) {
+  for (let i = 0; i < matrixSize.value; i++) {
     const pos = nodePositions.value[i] || { x: 400, y: 300 }
     const isFocus = i === focusNode.value
     const isNeighbor = neighborWeights[i] !== undefined
@@ -483,7 +486,8 @@ const barChartOption = computed(() => {
 const handleHeatmapClick = (params) => {
   if (params.data) {
     const [x, y, weight] = params.data
-    selectPair(x * 3, y * 3, weight)
+    const sampleRate = 3
+    selectPair(x * sampleRate, y * sampleRate, weight)
   }
 }
 
