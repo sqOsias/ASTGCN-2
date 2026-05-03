@@ -132,7 +132,7 @@ def train(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Train GRU baseline')
-    parser.add_argument('--data_path', type=str, default='data/PEMS04/pems04.npz')
+    parser.add_argument('--data_path', type=str, default='data/PEMS08/pems08.npz')
     parser.add_argument('--sensor_id', type=int, default=0, help='Sensor ID to predict')
     parser.add_argument('--hidden_size', type=int, default=64)
     parser.add_argument('--batch_size', type=int, default=64)

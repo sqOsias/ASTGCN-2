@@ -1,0 +1,1 @@
+python train.py --config configurations/PEMS04.conf 
