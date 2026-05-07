@@ -334,9 +334,9 @@ const mainChartOption = computed(() => {
     },
     tooltip: {
       trigger: 'axis',
-      backgroundColor: 'rgba(15, 23, 42, 0.95)',
-      borderColor: 'rgba(0, 212, 255, 0.3)',
-      textStyle: { color: '#e2e8f0', fontSize: 12 },
+      backgroundColor: 'rgba(255, 255, 255, 0.98)',
+      borderColor: 'rgba(37, 99, 235, 0.35)',
+      textStyle: { color: '#0f172a', fontSize: 12 },
       formatter: (params) => {
         let result = `<div style="font-weight:bold;margin-bottom:4px">${params[0].axisValue}</div>`
         params.forEach(p => {
@@ -350,9 +350,9 @@ const mainChartOption = computed(() => {
     xAxis: {
       type: 'category',
       data: xLabels,
-      axisLine: { lineStyle: { color: '#334155' } },
+      axisLine: { lineStyle: { color: '#cbd5e1' } },
       axisLabel: { 
-        color: '#64748b', 
+        color: '#475569', 
         fontSize: 10,
         interval: (index) => index % 6 === 0 || xLabels[index] === 'NOW'
       },
@@ -361,10 +361,10 @@ const mainChartOption = computed(() => {
     yAxis: {
       type: 'value',
       name: 'km/h',
-      nameTextStyle: { color: '#64748b', fontSize: 10 },
-      axisLine: { lineStyle: { color: '#334155' } },
-      axisLabel: { color: '#64748b', fontSize: 10 },
-      splitLine: { lineStyle: { color: '#1e293b' } },
+      nameTextStyle: { color: '#475569', fontSize: 10 },
+      axisLine: { lineStyle: { color: '#cbd5e1' } },
+      axisLabel: { color: '#475569', fontSize: 10 },
+      splitLine: { lineStyle: { color: '#e2e8f0' } },
       min: yMin,
       max: yMax
     },
@@ -431,8 +431,8 @@ const residualChartOption = computed(() => {
     yAxis: {
       type: 'value',
       axisLine: { show: false },
-      axisLabel: { color: '#64748b', fontSize: 9 },
-      splitLine: { lineStyle: { color: '#1e293b' } },
+      axisLabel: { color: '#475569', fontSize: 9 },
+      splitLine: { lineStyle: { color: '#e2e8f0' } },
       min: -range,
       max: range,
       interval: 25
@@ -474,22 +474,22 @@ const multiStepChartOption = computed(() => {
     },
     tooltip: {
       trigger: 'axis',
-      backgroundColor: 'rgba(15, 23, 42, 0.95)',
-      borderColor: 'rgba(0, 212, 255, 0.3)',
-      textStyle: { color: '#e2e8f0', fontSize: 11 },
+      backgroundColor: 'rgba(255, 255, 255, 0.98)',
+      borderColor: 'rgba(37, 99, 235, 0.35)',
+      textStyle: { color: '#0f172a', fontSize: 11 },
       formatter: (params) => `${params[0].name}: <b>${params[0].value?.toFixed(1)}</b> km/h`
     },
     xAxis: {
       type: 'category',
       data: steps,
-      axisLine: { lineStyle: { color: '#334155' } },
-      axisLabel: { color: '#64748b', fontSize: 9 }
+      axisLine: { lineStyle: { color: '#cbd5e1' } },
+      axisLabel: { color: '#475569', fontSize: 9 }
     },
     yAxis: {
       type: 'value',
       axisLine: { show: false },
-      axisLabel: { color: '#64748b', fontSize: 9 },
-      splitLine: { lineStyle: { color: '#1e293b' } },
+      axisLabel: { color: '#475569', fontSize: 9 },
+      splitLine: { lineStyle: { color: '#e2e8f0' } },
       min: 0,
       max: 140
     },
@@ -500,7 +500,7 @@ const multiStepChartOption = computed(() => {
       symbol: 'circle',
       symbolSize: 6,
       lineStyle: { color: '#f97316', width: 2 },
-      itemStyle: { color: '#f97316', borderColor: '#0a0e1a', borderWidth: 1 },
+      itemStyle: { color: '#f97316', borderColor: '#ffffff', borderWidth: 1 },
       areaStyle: {
         color: {
           type: 'linear',

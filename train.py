@@ -139,11 +139,77 @@ def _build_model(model_name, cfg, all_backbones, num_of_features,
     return net
 
 
-# ---------------------------------------------------------------------------
-# 构建优化器
-# ---------------------------------------------------------------------------
+
+# optimizer = MuonWithAuxAdam(param_groups)
+
+def _ensure_single_process_group():
+    """KellerJordan/Muon 内部调用 dist.get_world_size()，单卡场景需要先初始化默认 PG。"""
+    import torch.distributed as dist
+    if dist.is_available() and dist.is_initialized():
+        return
+    os.environ.setdefault('MASTER_ADDR', '127.0.0.1')
+    os.environ.setdefault('MASTER_PORT', '29555')
+    os.environ.setdefault('RANK', '0')
+    os.environ.setdefault('WORLD_SIZE', '1')
+    backend = 'nccl' if torch.cuda.is_available() else 'gloo'
+    try:
+        dist.init_process_group(backend=backend, rank=0, world_size=1)
+    except Exception:
+        # 部分环境 NCCL 不可用，退化到 gloo
+        dist.init_process_group(backend='gloo', rank=0, world_size=1)
+    print('[Muon] initialized single-process group (backend=%s)' % backend)
+
+
+def _build_muon_param_groups(net, muon_lr: float, aux_lr: float = 3e-4,
+                              weight_decay: float = 0.01):
+    """按名称 + 维度规则将参数分到 Muon / AdamW 两组。
+
+    - Muon: ndim >= 2 的隐藏权重（线性层、卷积核、注意力 W_*、Theta 等）
+    - AdamW (aux):
+        * 嵌入类: node_emb_src/dst, pos_emb, input_proj, temporal_proj
+        * 输出头: final_conv, final_linear, submodules.*.W (节点级缩放)
+        * 全部 1D 参数: bias, LayerNorm, 可学习 scalar 缩放等
+    """
+    embed_keys = (
+        'node_emb_src', 'node_emb_dst', 'pos_emb',
+        'input_proj', 'temporal_proj',
+    )
+    head_keys = ('final_conv', 'final_linear')
+
+    muon_params, aux_params = [], []
+    muon_names, aux_names = [], []
+
+    for name, p in net.named_parameters():
+        if not p.requires_grad:
+            continue
+
+        is_embed = any(k in name for k in embed_keys)
+        is_head = any(k in name for k in head_keys) or name.endswith('.W')
+        is_low_dim = p.ndim < 2
+
+        if is_low_dim or is_embed or is_head:
+            aux_params.append(p)
+            aux_names.append(name)
+        else:
+            muon_params.append(p)
+            muon_names.append(name)
+
+    if not muon_params:
+        raise SystemExit('No Muon-eligible (>=2D hidden) parameters found.')
+
+    param_groups = [
+        dict(params=muon_params, use_muon=True,
+             lr=muon_lr, weight_decay=weight_decay, momentum=0.95),
+        dict(params=aux_params, use_muon=False,
+             lr=aux_lr, betas=(0.9, 0.95), weight_decay=weight_decay),
+    ]
+    return param_groups, muon_names, aux_names
+
 
 def _build_optimizer(net, optimizer_name: str, lr: float):
+    # ---------------------------------------------------------------------------
+    # 构建优化器
+    # ---------------------------------------------------------------------------
     name = optimizer_name.lower()
     if name == 'adam':
         return torch.optim.Adam(net.parameters(), lr=lr)
@@ -151,6 +217,15 @@ def _build_optimizer(net, optimizer_name: str, lr: float):
         return torch.optim.SGD(net.parameters(), lr=lr)
     elif name == 'rmsprop':
         return torch.optim.RMSprop(net.parameters(), lr=lr)
+    elif name == 'muon':
+        from muon import MuonWithAuxAdam
+        _ensure_single_process_group()
+        param_groups, muon_names, aux_names = _build_muon_param_groups(
+            net, muon_lr=lr, aux_lr=3e-4, weight_decay=0.01,
+        )
+        print('[Muon] %d hidden params -> Muon | %d aux params -> AdamW'
+              % (len(muon_names), len(aux_names)))
+        return MuonWithAuxAdam(param_groups)
     raise SystemExit('Unsupported optimizer: %s' % optimizer_name)
 
 
@@ -212,6 +287,8 @@ def run_training(cfg: ExperimentConfig, params_path: str,
 
     trainer = _build_optimizer(net, train_cfg.optimizer, learning_rate)
     loss_function = nn.MSELoss(reduction='none')
+    print(f"[info] optimizer: {trainer.__class__.__name__}")
+    print(f"[info] loss function: {loss_function.__class__.__name__}")
 
     # 计算评估 horizon
     pph = data_cfg.points_per_hour

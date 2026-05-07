@@ -1,5 +1,5 @@
 <template>
-  <div class="h-full flex bg-[#0a0e1a] p-4 gap-4">
+  <div class="h-full flex bg-[#f6f8fb] p-4 gap-4">
     <!-- Left: Performance Charts -->
     <div class="flex-1 flex flex-col gap-4">
       <!-- Model Metrics Comparison -->
@@ -170,13 +170,13 @@ const metricsChartOption = computed(() => ({
   backgroundColor: 'transparent',
   tooltip: {
     trigger: 'axis',
-    backgroundColor: 'rgba(10, 14, 26, 0.95)',
-    borderColor: 'rgba(34, 211, 238, 0.3)',
-    textStyle: { color: '#e2e8f0' }
+    backgroundColor: 'rgba(255, 255, 255, 0.98)',
+    borderColor: 'rgba(37, 99, 235, 0.35)',
+    textStyle: { color: '#0f172a' }
   },
   legend: {
     data: ['MAE', 'RMSE', 'MAPE (%)'],
-    textStyle: { color: '#94a3b8' },
+    textStyle: { color: '#475569' },
     top: 10
   },
   grid: {
@@ -189,24 +189,24 @@ const metricsChartOption = computed(() => ({
   xAxis: {
     type: 'category',
     data: Object.keys(modelData),
-    axisLine: { lineStyle: { color: '#334155' } },
-    axisLabel: { color: '#94a3b8', fontSize: 12 }
+    axisLine: { lineStyle: { color: '#cbd5e1' } },
+    axisLabel: { color: '#475569', fontSize: 12 }
   },
   yAxis: [
     {
       type: 'value',
       name: 'MAE/RMSE',
-      nameTextStyle: { color: '#64748b' },
-      axisLine: { lineStyle: { color: '#334155' } },
-      axisLabel: { color: '#64748b' },
-      splitLine: { lineStyle: { color: '#1e293b' } }
+      nameTextStyle: { color: '#475569' },
+      axisLine: { lineStyle: { color: '#cbd5e1' } },
+      axisLabel: { color: '#475569' },
+      splitLine: { lineStyle: { color: '#e2e8f0' } }
     },
     {
       type: 'value',
       name: 'MAPE (%)',
-      nameTextStyle: { color: '#64748b' },
-      axisLine: { lineStyle: { color: '#334155' } },
-      axisLabel: { color: '#64748b' },
+      nameTextStyle: { color: '#475569' },
+      axisLine: { lineStyle: { color: '#cbd5e1' } },
+      axisLabel: { color: '#475569' },
       splitLine: { show: false }
     }
   ],
@@ -267,13 +267,13 @@ const horizonChartOption = computed(() => ({
   backgroundColor: 'transparent',
   tooltip: {
     trigger: 'axis',
-    backgroundColor: 'rgba(10, 14, 26, 0.95)',
-    borderColor: 'rgba(34, 211, 238, 0.3)',
-    textStyle: { color: '#e2e8f0' }
+    backgroundColor: 'rgba(255, 255, 255, 0.98)',
+    borderColor: 'rgba(37, 99, 235, 0.35)',
+    textStyle: { color: '#0f172a' }
   },
   legend: {
     data: ['ASTGCN', 'STGCN', 'LSTM', 'HA'],
-    textStyle: { color: '#94a3b8' },
+    textStyle: { color: '#475569' },
     top: 10
   },
   grid: {
@@ -288,18 +288,18 @@ const horizonChartOption = computed(() => ({
     name: '预测步长',
     nameLocation: 'middle',
     nameGap: 30,
-    nameTextStyle: { color: '#64748b' },
+    nameTextStyle: { color: '#475569' },
     data: horizonData.steps,
-    axisLine: { lineStyle: { color: '#334155' } },
-    axisLabel: { color: '#94a3b8' }
+    axisLine: { lineStyle: { color: '#cbd5e1' } },
+    axisLabel: { color: '#475569' }
   },
   yAxis: {
     type: 'value',
     name: 'MAE (km/h)',
-    nameTextStyle: { color: '#64748b' },
-    axisLine: { lineStyle: { color: '#334155' } },
-    axisLabel: { color: '#64748b' },
-    splitLine: { lineStyle: { color: '#1e293b' } }
+    nameTextStyle: { color: '#475569' },
+    axisLine: { lineStyle: { color: '#cbd5e1' } },
+    axisLabel: { color: '#475569' },
+    splitLine: { lineStyle: { color: '#e2e8f0' } }
   },
   series: [
     {
@@ -310,13 +310,13 @@ const horizonChartOption = computed(() => ({
       symbol: 'circle',
       symbolSize: 8,
       lineStyle: { color: '#22d3ee', width: 3 },
-      itemStyle: { color: '#22d3ee', borderColor: '#0a0e1a', borderWidth: 2 },
+      itemStyle: { color: '#0891b2', borderColor: '#ffffff', borderWidth: 2 },
       areaStyle: {
         color: {
           type: 'linear',
           x: 0, y: 0, x2: 0, y2: 1,
           colorStops: [
-            { offset: 0, color: 'rgba(34, 211, 238, 0.3)' },
+            { offset: 0, color: 'rgba(37, 99, 235, 0.35)' },
             { offset: 1, color: 'rgba(34, 211, 238, 0)' }
           ]
         }
@@ -349,8 +349,8 @@ const horizonChartOption = computed(() => ({
       smooth: true,
       symbol: 'triangle',
       symbolSize: 6,
-      lineStyle: { color: '#64748b', width: 2, type: 'dotted' },
-      itemStyle: { color: '#64748b' }
+      lineStyle: { color: '#475569', width: 2, type: 'dotted' },
+      itemStyle: { color: '#475569' }
     }
   ]
 }))

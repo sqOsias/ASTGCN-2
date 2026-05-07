@@ -1,5 +1,5 @@
 <template>
-  <Splitpanes class="h-full bg-[#0a0e1a]">
+  <Splitpanes class="h-full bg-[#f6f8fb]">
     <Pane :size="76" :min-size="30">
     <!-- Main Graph Area -->
     <div class="h-full relative overflow-hidden">
@@ -56,7 +56,7 @@
           <el-switch 
             v-model="epicenterMode" 
             active-color="#ef4444"
-            inactive-color="#334155"
+            inactive-color="#cbd5e1"
             size="small"
           />
         </div>
@@ -106,7 +106,7 @@
     </Pane>
     <Pane :size="24" :min-size="8">
     <!-- Right Sidebar -->
-    <Splitpanes horizontal class="h-full bg-[#0d1220]">
+    <Splitpanes horizontal class="h-full bg-[#f1f5f9]">
       <Pane :size="28" :min-size="10">
         <!-- Metrics Panel -->
         <div class="h-full p-4 overflow-auto">
@@ -415,8 +415,8 @@ const chartOption = computed(() => {
       fixed: true,
       symbolSize: isTop5 ? 16 : isCongested ? 10 : 5,
       itemStyle: {
-        color: isCongested ? '#ef4444' : speed < 50 ? 'rgba(251,191,36,0.7)' : 'rgba(34,211,238,0.4)',
-        borderColor: isTop5 ? '#fef2f2' : 'transparent',
+        color: isCongested ? '#dc2626' : speed < 50 ? 'rgba(217,119,6,0.85)' : 'rgba(37,99,235,0.65)',
+        borderColor: isTop5 ? '#7f1d1d' : 'transparent',
         borderWidth: isTop5 ? 2 : 0,
         shadowColor: isCongested ? 'rgba(239,68,68,0.8)' : 'transparent',
         shadowBlur: isCongested ? 15 : 0
@@ -441,19 +441,19 @@ const chartOption = computed(() => {
     let edgeColor, edgeWidth, shadowColor, shadowBlur
     if (avgSpeed < 40) {
       // Severe congestion - bright red with glow
-      edgeColor = 'rgba(239, 68, 68, 0.95)'
+      edgeColor = 'rgba(220, 38, 38, 0.95)'
       edgeWidth = 3
       shadowColor = 'rgba(239, 68, 68, 0.8)'
       shadowBlur = 12
     } else if (avgSpeed < 80) {
       // Slow traffic - yellow/amber
-      edgeColor = 'rgba(251, 191, 36, 0.8)'
+      edgeColor = 'rgba(217, 119, 6, 0.85)'
       edgeWidth = 2
       shadowColor = 'rgba(251, 191, 36, 0.4)'
       shadowBlur = 6
     } else {
       // Normal flow - subtle cyan (hidden by default, show on hover)
-      edgeColor = 'rgba(34, 211, 238, 0.15)'
+      edgeColor = 'rgba(37, 99, 235, 0.22)'
       edgeWidth = 0.5
       shadowColor = 'transparent'
       shadowBlur = 0
@@ -475,18 +475,18 @@ const chartOption = computed(() => {
     backgroundColor: 'transparent',
     tooltip: {
       trigger: 'item',
-      backgroundColor: 'rgba(10, 14, 26, 0.95)',
-      borderColor: 'rgba(34, 211, 238, 0.3)',
+      backgroundColor: 'rgba(255, 255, 255, 0.98)',
+      borderColor: 'rgba(37, 99, 235, 0.35)',
       borderWidth: 1,
-      textStyle: { color: '#e2e8f0', fontSize: 12 },
+      textStyle: { color: '#0f172a', fontSize: 12 },
       formatter: (params) => {
         if (params.dataType === 'node') {
           const speed = params.value
           const status = speed > 50 ? '畅通' : speed > 20 ? '缓行' : '拥堵'
-          const statusColor = speed > 50 ? '#22d3ee' : speed > 20 ? '#fbbf24' : '#ef4444'
+          const statusColor = speed > 50 ? '#0891b2' : speed > 20 ? '#d97706' : '#dc2626'
           return `<div style="font-weight:600;margin-bottom:4px">${params.name}</div>
-                  <div style="color:#94a3b8">车速: <span style="color:${statusColor};font-weight:600">${speed?.toFixed(1)} km/h</span></div>
-                  <div style="color:#94a3b8">状态: <span style="color:${statusColor}">${status}</span></div>`
+                  <div style="color:#475569">车速: <span style="color:${statusColor};font-weight:600">${speed?.toFixed(1)} km/h</span></div>
+                  <div style="color:#475569">状态: <span style="color:${statusColor}">${status}</span></div>`
         }
         return ''
       }
@@ -503,7 +503,7 @@ const chartOption = computed(() => {
       emphasis: {
         focus: 'adjacency',
         lineStyle: { width: 4 },
-        itemStyle: { borderColor: '#fff', borderWidth: 2 }
+        itemStyle: { borderColor: '#0f172a', borderWidth: 2 }
       },
       blur: {
         itemStyle: { opacity: 0.3 }

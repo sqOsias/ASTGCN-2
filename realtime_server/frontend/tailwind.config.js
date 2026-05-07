@@ -7,14 +7,17 @@ export default {
   theme: {
     extend: {
       colors: {
-        'cyber-dark': '#0a0e17',
-        'cyber-darker': '#060910',
-        'cyber-blue': '#00d4ff',
-        'cyber-purple': '#a855f7',
-        'cyber-green': '#22c55e',
-        'cyber-yellow': '#eab308',
-        'cyber-red': '#ef4444',
-        'cyber-orange': '#f97316',
+        // Thesis-light palette. Variable names retained for backwards
+        // compatibility with existing class usage; values shifted from
+        // neon "cyber" tones to print-friendly tokens.
+        'cyber-dark': '#f6f8fb',     // page background
+        'cyber-darker': '#ffffff',   // panel / header surface
+        'cyber-blue': '#2563eb',     // primary accent (blue-600)
+        'cyber-purple': '#7c3aed',   // secondary accent (violet-600)
+        'cyber-green': '#16a34a',    // success (green-600)
+        'cyber-yellow': '#d97706',   // warning (amber-600)
+        'cyber-red': '#dc2626',      // danger (red-600)
+        'cyber-orange': '#ea580c',   // alt warning (orange-600)
       }
     },
   },

@@ -1,5 +1,5 @@
 <template>
-  <Splitpanes class="h-full bg-[#0a0e1a]">
+  <Splitpanes class="h-full bg-[#f6f8fb]">
     <Pane :size="75" :min-size="30">
     <!-- Main Graph Area -->
     <div class="h-full relative overflow-hidden">
@@ -68,7 +68,7 @@
     </Pane>
     <Pane :size="25" :min-size="8">
     <!-- Right Sidebar -->
-    <Splitpanes horizontal class="h-full bg-[#0d1220]">
+    <Splitpanes horizontal class="h-full bg-[#f1f5f9]">
       <Pane :size="40" :min-size="15">
       <!-- Route Input Panel -->
       <div class="h-full p-4 overflow-auto">
@@ -144,7 +144,7 @@
             </div>
             <div class="grid grid-cols-3 gap-2 text-center">
               <div>
-                <div class="text-lg font-mono font-bold text-white">{{ route.eta_minutes }}</div>
+                <div class="text-lg font-mono font-bold text-slate-900">{{ route.eta_minutes }}</div>
                 <div class="text-[10px] text-slate-500">预计(分钟)</div>
               </div>
               <div>
@@ -493,11 +493,16 @@ const chartOption = computed(() => {
     const isSource = i === sourceNode.value
     const isTarget = i === targetNode.value
 
-    // Check if node is on any route
+    // Check if node is on any route (prioritize active route so shared segments
+    // adopt the currently selected route's color)
     let onRoute = -1
     if (isPlanning) {
-      for (let r = 0; r < currentRouteNodes.length; r++) {
-        if (currentRouteNodes[r].has(i)) { onRoute = r; break }
+      if (currentRouteNodes[aRoute] && currentRouteNodes[aRoute].has(i)) {
+        onRoute = aRoute
+      } else {
+        for (let r = 0; r < currentRouteNodes.length; r++) {
+          if (currentRouteNodes[r].has(i)) { onRoute = r; break }
+        }
       }
     }
 
@@ -505,16 +510,16 @@ const chartOption = computed(() => {
 
     let color, size, borderColor, borderWidth, shadowColor, shadowBlur
     if (isSource) {
-      color = '#00ff88'
+      color = '#16a34a'
       size = 18
-      borderColor = '#ffffff'
+      borderColor = '#0f172a'
       borderWidth = 3
       shadowColor = 'rgba(0,255,136,0.8)'
       shadowBlur = 20
     } else if (isTarget) {
-      color = '#ff4466'
+      color = '#dc2626'
       size = 18
-      borderColor = '#ffffff'
+      borderColor = '#0f172a'
       borderWidth = 3
       shadowColor = 'rgba(255,68,102,0.8)'
       shadowBlur = 20
@@ -526,8 +531,8 @@ const chartOption = computed(() => {
       shadowColor = onRoute === aRoute ? routeColors[onRoute] + '80' : 'transparent'
       shadowBlur = onRoute === aRoute ? 10 : 0
     } else {
-      const speedColor = speed > 50 ? 'rgba(34,211,238,0.4)' : speed > 20 ? 'rgba(251,191,36,0.7)' : 'rgba(239,68,68,1)'
-      color = dimmed ? 'rgba(100,116,139,0.08)' : speedColor
+      const speedColor = speed > 50 ? 'rgba(37,99,235,0.6)' : speed > 20 ? 'rgba(217,119,6,0.85)' : 'rgba(220,38,38,1)'
+      color = dimmed ? 'rgba(148,163,184,0.25)' : speedColor
       size = dimmed ? 2 : (speed < 20 ? 10 : 5)
       borderColor = 'transparent'
       borderWidth = 0
@@ -556,11 +561,16 @@ const chartOption = computed(() => {
     const targetSpeed = nodeSpeedMap.value[edge.target] || 60
     const avgSpeed = (sourceSpeed + targetSpeed) / 2
 
-    // Check if edge is on any route
+    // Check if edge is on any route (prioritize active route so shared segments
+    // adopt the currently selected route's color)
     let onRoute = -1
     if (isPlanning) {
-      for (let r = 0; r < currentRouteEdges.length; r++) {
-        if (currentRouteEdges[r].has(key1)) { onRoute = r; break }
+      if (currentRouteEdges[aRoute] && currentRouteEdges[aRoute].has(key1)) {
+        onRoute = aRoute
+      } else {
+        for (let r = 0; r < currentRouteEdges.length; r++) {
+          if (currentRouteEdges[r].has(key1)) { onRoute = r; break }
+        }
       }
     }
 
@@ -602,7 +612,7 @@ const chartOption = computed(() => {
         eShadowColor = 'rgba(251,191,36,0.4)'
         eShadowBlur = 6
       } else {
-        edgeColor = 'rgba(34,211,238,0.15)'
+        edgeColor = 'rgba(37,99,235,0.22)'
         edgeWidth = 0.5
         eShadowColor = 'transparent'
         eShadowBlur = 0
@@ -620,22 +630,22 @@ const chartOption = computed(() => {
     backgroundColor: 'transparent',
     tooltip: {
       trigger: 'item',
-      backgroundColor: 'rgba(10,14,26,0.95)',
-      borderColor: 'rgba(34,211,238,0.3)',
+      backgroundColor: 'rgba(255, 255, 255, 0.98)',
+      borderColor: 'rgba(37, 99, 235, 0.35)',
       borderWidth: 1,
-      textStyle: { color: '#e2e8f0', fontSize: 12 },
+      textStyle: { color: '#0f172a', fontSize: 12 },
       formatter: (params) => {
         if (params.dataType === 'node') {
           const speed = params.value
           const nodeId = parseInt(params.data.id)
           const tags = []
-          if (nodeId === sourceNode.value) tags.push('<span style="color:#00ff88">● 起点</span>')
-          if (nodeId === targetNode.value) tags.push('<span style="color:#ff4466">● 终点</span>')
+          if (nodeId === sourceNode.value) tags.push('<span style="color:#16a34a">● 起点</span>')
+          if (nodeId === targetNode.value) tags.push('<span style="color:#dc2626">● 终点</span>')
           const status = speed > 50 ? '畅通' : speed > 20 ? '缓行' : '拥堵'
-          const sc = speed > 50 ? '#22d3ee' : speed > 20 ? '#fbbf24' : '#ef4444'
+          const sc = speed > 50 ? '#0891b2' : speed > 20 ? '#d97706' : '#dc2626'
           return `<div style="font-weight:600;margin-bottom:4px">${params.name} ${tags.join(' ')}</div>
-                  <div style="color:#94a3b8">车速: <span style="color:${sc};font-weight:600">${speed?.toFixed(1)} km/h</span></div>
-                  <div style="color:#94a3b8">状态: <span style="color:${sc}">${status}</span></div>`
+                  <div style="color:#475569">车速: <span style="color:${sc};font-weight:600">${speed?.toFixed(1)} km/h</span></div>
+                  <div style="color:#475569">状态: <span style="color:${sc}">${status}</span></div>`
         }
         return ''
       }
@@ -672,7 +682,7 @@ onUnmounted(() => {
   left: 0;
   right: 0;
   height: 2px;
-  background: linear-gradient(90deg, transparent, rgba(34, 211, 238, 0.3), transparent);
+  background: linear-gradient(90deg, transparent, rgba(37, 99, 235, 0.25), transparent);
   animation: scan 4s linear infinite;
 }
 

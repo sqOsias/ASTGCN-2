@@ -12,7 +12,7 @@
           </h1>
         </div>
         <div class="h-6 w-px bg-cyan-500/30"></div>
-        <span class="text-xs text-slate-400">ASTGCN Deep Learning Engine</span>
+        <span class="text-xs text-slate-400">AST-Informer Deep Learning Engine</span>
       </div>
       
       <div class="flex items-center gap-6">

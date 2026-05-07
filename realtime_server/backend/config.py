@@ -58,7 +58,7 @@ CONFIG = {
     'distance_path': os.path.join(_PROJECT_ROOT, 'data/PEMS04/distance.csv'),
     'model_path': os.path.join(
         _PROJECT_ROOT,
-        'results/ASTGCN_lr0p001/1_1_20260414153308/checkpoints/best_model.pth',
+        'results/ASTGCN_lr0p001/1_1_20260503100704/checkpoints/best_model.pth',
     ),
 }
 

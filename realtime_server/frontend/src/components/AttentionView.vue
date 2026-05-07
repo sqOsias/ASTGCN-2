@@ -1,5 +1,5 @@
 <template>
-  <Splitpanes class="h-full bg-[#0a0e1a]">
+  <Splitpanes class="h-full bg-[#f6f8fb]">
     <Pane :size="75" :min-size="30">
     <!-- Left: Main Content -->
     <div class="h-full flex flex-col min-w-0">
@@ -57,7 +57,7 @@
           />
           <div
             v-if="loading"
-            class="absolute inset-0 flex items-center justify-center bg-slate-900/80 z-10"
+            class="absolute inset-0 flex items-center justify-center bg-white/85 z-10"
           >
             <div class="text-center">
               <el-icon :size="36" class="animate-spin text-cyan-400"><Loading /></el-icon>
@@ -87,7 +87,7 @@
 
     <Pane :size="25" :min-size="8">
     <!-- Right sidebar -->
-    <Splitpanes horizontal class="h-full bg-[#080c16]">
+    <Splitpanes horizontal class="h-full bg-[#f1f5f9]">
       <Pane :size="30" :min-size="10">
         <!-- Node pair info -->
         <div class="h-full p-4 overflow-auto">
@@ -303,10 +303,10 @@ const heatmapOption = computed(() => {
     backgroundColor: 'transparent',
     tooltip: {
       position: 'top',
-      backgroundColor: 'rgba(10,14,26,0.95)',
-      borderColor: 'rgba(34,211,238,0.3)',
+      backgroundColor: 'rgba(255, 255, 255, 0.98)',
+      borderColor: 'rgba(37, 99, 235, 0.35)',
       borderWidth: 1,
-      textStyle: { color: '#e2e8f0', fontSize: 11 },
+      textStyle: { color: '#0f172a', fontSize: 11 },
       formatter: (params) => {
         const [x, y, val] = params.data
         return `<b>Node_${x * sampleRate} → Node_${y * sampleRate}</b><br/>注意力权重: <span style="color:#f97316">${val.toFixed(4)}</span>`
@@ -317,7 +317,7 @@ const heatmapOption = computed(() => {
       type: 'category',
       data: Array.from({ length: sampledSize }, (_, i) => i * sampleRate),
       splitArea: { show: false },
-      axisLine: { lineStyle: { color: '#1e293b' } },
+      axisLine: { lineStyle: { color: '#e2e8f0' } },
       axisLabel: { color: '#475569', fontSize: 8, interval: 9, rotate: 45 },
       name: '目标节点', nameLocation: 'center', nameGap: 35,
       nameTextStyle: { color: '#475569', fontSize: 10 }
@@ -326,7 +326,7 @@ const heatmapOption = computed(() => {
       type: 'category',
       data: Array.from({ length: sampledSize }, (_, i) => i * sampleRate),
       splitArea: { show: false },
-      axisLine: { lineStyle: { color: '#1e293b' } },
+      axisLine: { lineStyle: { color: '#e2e8f0' } },
       axisLabel: { color: '#475569', fontSize: 8, interval: 9 },
       name: '源节点', nameLocation: 'center', nameGap: 40,
       nameTextStyle: { color: '#475569', fontSize: 10 }
@@ -337,7 +337,7 @@ const heatmapOption = computed(() => {
       right: 5, top: 'center',
       itemHeight: 180,
       textStyle: { color: '#475569', fontSize: 9 },
-      inRange: { color: ['#0a0e1a', '#0c2340', '#1d4ed8', '#f59e0b', '#ef4444'] }
+      inRange: { color: ['#eff6ff', '#bfdbfe', '#60a5fa', '#f59e0b', '#dc2626'] }
     },
     series: [{
       name: 'Attention',
@@ -408,10 +408,10 @@ const graphOption = computed(() => {
     backgroundColor: 'transparent',
     tooltip: {
       trigger: 'item',
-      backgroundColor: 'rgba(10,14,26,0.95)',
-      borderColor: 'rgba(34,211,238,0.3)',
+      backgroundColor: 'rgba(255, 255, 255, 0.98)',
+      borderColor: 'rgba(37, 99, 235, 0.35)',
       borderWidth: 1,
-      textStyle: { color: '#e2e8f0', fontSize: 11 },
+      textStyle: { color: '#0f172a', fontSize: 11 },
       formatter: (p) => {
         if (p.dataType === 'node') {
           const w = neighborWeights[parseInt(p.data.id)]
@@ -443,23 +443,23 @@ const barChartOption = computed(() => {
     backgroundColor: 'transparent',
     tooltip: {
       trigger: 'axis',
-      backgroundColor: 'rgba(10,14,26,0.95)',
-      borderColor: 'rgba(34,211,238,0.3)',
+      backgroundColor: 'rgba(255, 255, 255, 0.98)',
+      borderColor: 'rgba(37, 99, 235, 0.35)',
       borderWidth: 1,
-      textStyle: { color: '#e2e8f0', fontSize: 11 },
+      textStyle: { color: '#0f172a', fontSize: 11 },
       formatter: (p) => `Node_${p[0].name}<br/>权重: <span style="color:#f97316">${p[0].value.toFixed(4)}</span>`
     },
     grid: { left: 45, right: 10, top: 5, bottom: 20 },
     xAxis: {
       type: 'category',
       data: data.map(d => d.node),
-      axisLine: { lineStyle: { color: '#1e293b' } },
-      axisLabel: { color: '#64748b', fontSize: 9, rotate: 45 }
+      axisLine: { lineStyle: { color: '#e2e8f0' } },
+      axisLabel: { color: '#475569', fontSize: 9, rotate: 45 }
     },
     yAxis: {
       type: 'value',
       axisLine: { show: false },
-      splitLine: { lineStyle: { color: '#1e293b' } },
+      splitLine: { lineStyle: { color: '#e2e8f0' } },
       axisLabel: { color: '#475569', fontSize: 8, formatter: (v) => v.toFixed(3) }
     },
     series: [{

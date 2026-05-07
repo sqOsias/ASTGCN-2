@@ -164,6 +164,11 @@ def register_routes(app):
         
         return {"nodes": result}
 
+    @app.get("/api/benchmark/stage_timings")
+    async def benchmark_stage_timings():
+        """Return last-tick server-side stage timings (ms) for benchmarking."""
+        return get_last_stage_timings()
+
     @app.get("/api/stats")
     async def get_system_stats():
         """Get system statistics"""
